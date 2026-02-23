@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ChimeraMetal Desk</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="bg">
+    <div class="orb o1"></div>
+    <div class="orb o2"></div>
+    <div class="orb o3"></div>
+  </div>
+
+  <header class="topbar glass">
+    <div class="brand">
+      <div class="logo">C</div>
+      <div class="meta">
+        <div class="title">ChimeraMetal</div>
+        <div class="subtitle">Glass Desk ? Telemetry & Latency</div>
+      </div>
+    </div>
+
+    <div class="right">
+      <div class="chip" id="clock">--:--:--</div>
+      <div class="chip ok" id="netState">CONNECTING</div>
+    </div>
+  </header>
+
+  <main class="grid">
+    <section class="panel glass">
+      <div class="panelTitle">VPS Fleet</div>
+      <div class="panelHint">Each tile is a telemetry endpoint. Add more VPS URLs in <span class="mono">web/app.js</span>.</div>
+      <div class="fleet" id="fleet"></div>
+    </section>
+
+    <section class="panel glass">
+      <div class="panelTitle">Latency to Equinix</div>
+      <div class="panelHint">Measured as TCP handshake time (connect) from each VPS to the listed targets (p50/p95).</div>
+      <div class="latGrid" id="latGrid"></div>
+    </section>
+
+    <section class="panel glass wide">
+      <div class="panelTitle">Operator Tools</div>
+      <div class="tools">
+        <div class="tool glass2">
+          <div class="toolTitle">Quick Checks (VPS PowerShell)</div>
+          <pre class="mono">netstat -ano | findstr 7777
+Test-NetConnection -ComputerName 127.0.0.1 -Port 7777
+Test-NetConnection -ComputerName live-uk-eqx-01.p.c-trader.com -Port 443</pre>
+        </div>
+
+        <div class="tool glass2">
+          <div class="toolTitle">Firewall Rule (Inbound 7777)</div>
+          <pre class="mono">New-NetFirewallRule -DisplayName "Chimera7777" -Direction Inbound -LocalPort 7777 -Protocol TCP -Action Allow</pre>
+        </div>
+
+        <div class="tool glass2">
+          <div class="toolTitle">Latency Probe Script</div>
+          <pre class="mono">powershell -ExecutionPolicy Bypass -File .\tools\LatencyProbe.ps1 -Targets "live-uk-eqx-01.p.c-trader.com:443,demo-uk-eqx-01.p.c-trader.com:443" -Count 60 -OutCsv ".\latency.csv"</pre>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="mono">/api/status</div>
+    <div class="muted">ChimeraMetal Desk</div>
+  </footer>
+
+  <script src="/app.js"></script>
+</body>
+</html>
