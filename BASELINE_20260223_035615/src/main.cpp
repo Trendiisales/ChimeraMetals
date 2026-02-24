@@ -215,8 +215,8 @@ std::string build_marketdata_req(int seq)
          << "269=0\x01"
          << "269=1\x01"
          << "146=2\x01"
-         << "55=XAUUSD\x01"
-         << "55=XAGUSD\x01";
+         << "55=41\x01"
+         << "55=42\x01";
 
     return wrap_fix(body.str());
 }
