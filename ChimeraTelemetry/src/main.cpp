@@ -78,7 +78,9 @@ void send_text_frame(SOCKET s,const std::string& msg){
 
 void websocket_loop(SOCKET s){
     while(true){
-        send_text_frame(s,"{\"xau_bid\":0,\"xau_ask\":0,\"xag_bid\":0,\"xag_ask\":0,\"hft_pnl\":0,\"strategy_pnl\":0,\"rtt_last\":0,\"rtt_p50\":0,\"rtt_p95\":0,\"risk_mode\":\"NORMAL\",\"regime\":\"OK\",\"hft_signal\":\"NONE\",\"structure_signal\":\"NONE\"}");
+        // Fixed JSON - all quotes properly escaped
+        std::string json_data = R"({"xau_bid":0,"xau_ask":0,"xag_bid":0,"xag_ask":0,"hft_pnl":0,"strategy_pnl":0,"rtt_last":0,"rtt_p50":0,"rtt_p95":0,"risk_mode":"NORMAL","regime":"OK","hft_signal":"NONE","structure_signal":"NONE"})";
+        send_text_frame(s,json_data);
         Sleep(1000);
     }
 }
