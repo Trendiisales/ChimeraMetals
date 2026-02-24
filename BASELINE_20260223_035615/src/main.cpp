@@ -45,6 +45,12 @@ Config g_cfg;
 std::atomic<bool> g_running(true);
 std::map<std::string, double> g_bid;
 std::map<std::string, double> g_ask;
+
+// Global price state for telemetry
+double g_xau_bid = 0.0;
+double g_xau_ask = 0.0;
+double g_xag_bid = 0.0;
+double g_xag_ask = 0.0;
 TelemetryWriter g_telemetry;
 
 // ============================================================================
@@ -338,22 +344,21 @@ void quote_loop(FixSession& session)
             }
 
             if (symbolId == 41) {
+                g_xau_bid = bid;
+                g_xau_ask = ask;
                 g_bid["XAUUSD"] = bid;
                 g_ask["XAUUSD"] = ask;
                 std::cout << "[QUOTE] XAUUSD: " << std::fixed << std::setprecision(2) << bid << " / " << ask << "\n";
             }
             else if (symbolId == 42) {
+                g_xag_bid = bid;
+                g_xag_ask = ask;
                 g_bid["XAGUSD"] = bid;
                 g_ask["XAGUSD"] = ask;
                 std::cout << "[QUOTE] XAGUSD: " << std::fixed << std::setprecision(2) << bid << " / " << ask << "\n";
             }
 
-            double xau_bid = g_bid.count("XAUUSD") ? g_bid["XAUUSD"] : 0.0;
-            double xau_ask = g_ask.count("XAUUSD") ? g_ask["XAUUSD"] : 0.0;
-            double xag_bid = g_bid.count("XAGUSD") ? g_bid["XAGUSD"] : 0.0;
-            double xag_ask = g_ask.count("XAGUSD") ? g_ask["XAGUSD"] : 0.0;
-
-            g_telemetry.Update(xau_bid, xau_ask, xag_bid, xag_ask, 0.0, 0.0, 0.0, 0.0, 0.0, "NORMAL", "CONNECTED", "NONE", "NONE");
+            g_telemetry.Update(g_xau_bid, g_xau_ask, g_xag_bid, g_xag_ask, 0.0, 0.0, 0.0, 0.0, 0.0, "NORMAL", "CONNECTED", "NONE", "NONE");
         }
 
         if (msg.find("35=1") != std::string::npos) {
