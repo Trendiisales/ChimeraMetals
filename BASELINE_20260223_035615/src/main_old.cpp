@@ -171,27 +171,25 @@ std::string wrap_fix(const std::string& body)
     return msg.str();
 }
 
-// FIXED: Correct logon for cTrader
-std::string build_logon(int seq, const std::string& sub_id)
+std::string build_logon(int seq)
 {
     std::stringstream body;
     body << "35=A\x01"
          << "49=" << g_cfg.sender << "\x01"
          << "56=" << g_cfg.target << "\x01"
-         << "50=" << sub_id << "\x01"
-         << "57=" << sub_id << "\x01"
+         << "50=QUOTE\x01"
+         << "57=QUOTE\x01"
          << "34=" << seq << "\x01"
          << "52=" << timestamp() << "\x01"
          << "98=0\x01"
          << "108=" << g_cfg.heartbeat << "\x01"
-         << "141=Y\x01"                     // ResetSeqNumFlag - send ONLY on clean start
+         << "141=Y\x01"
          << "553=" << g_cfg.username << "\x01"
          << "554=" << g_cfg.password << "\x01";
 
     return wrap_fix(body.str());
 }
 
-// FIXED: Security list request with 559=0 for cTrader
 std::string build_security_list_req(int seq)
 {
     std::stringstream body;
@@ -203,12 +201,11 @@ std::string build_security_list_req(int seq)
          << "34=" << seq << "\x01"
          << "52=" << timestamp() << "\x01"
          << "320=ListReq-" << seq << "\x01"
-         << "559=0\x01";          // FIXED: Was 559=1, must be 559=0 for cTrader
+         << "559=1\x01";
 
     return wrap_fix(body.str());
 }
 
-// FIXED: Market data request with correct group ordering
 std::string build_marketdata_req(int seq)
 {
     std::stringstream body;
@@ -220,31 +217,15 @@ std::string build_marketdata_req(int seq)
          << "34=" << seq << "\x01"
          << "52=" << timestamp() << "\x01"
          << "262=MDReq-" << seq << "\x01"
-         << "263=1\x01"        // Snapshot + Updates
-         << "264=1\x01"        // FIXED: Top of book only (was 0, FX requires 1)
-         << "265=1\x01"        // Incremental updates
-         << "267=2\x01"        // NoMDEntryTypes
-         << "269=0\x01"        // Bid
-         << "269=1\x01"        // Offer
-         << "146=2\x01"        // NoRelatedSym
+         << "263=1\x01"
+         << "264=0\x01"
+         << "265=1\x01"
+         << "146=2\x01"
          << "55=XAUUSD\x01"
-         << "55=XAGUSD\x01";
-
-    return wrap_fix(body.str());
-}
-
-// FIXED: Proper heartbeat response
-std::string build_heartbeat(int seq, const std::string& test_id, const std::string& sub_id)
-{
-    std::stringstream body;
-    body << "35=0\x01"
-         << "49=" << g_cfg.sender << "\x01"
-         << "56=" << g_cfg.target << "\x01"
-         << "50=" << sub_id << "\x01"
-         << "57=" << sub_id << "\x01"
-         << "34=" << seq << "\x01"
-         << "52=" << timestamp() << "\x01"
-         << "112=" << test_id << "\x01";
+         << "55=XAGUSD\x01"
+         << "267=2\x01"
+         << "269=0\x01"
+         << "269=1\x01";
 
     return wrap_fix(body.str());
 }
@@ -271,14 +252,14 @@ void quote_session()
     SSL_CTX* ctx = SSL_CTX_new(TLS_client_method());
     if (!ctx)
     {
-        std::cout << "[ERROR] SSL CTX FAILED\n";
+        std::cout << "SSL CTX FAILED\n";
         return;
     }
 
     struct hostent* he = gethostbyname(g_cfg.host.c_str());
     if (!he)
     {
-        std::cout << "[ERROR] HOST LOOKUP FAILED\n";
+        std::cout << "HOST LOOKUP FAILED\n";
         SSL_CTX_free(ctx);
         return;
     }
@@ -286,7 +267,7 @@ void quote_session()
     SOCKET sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock == INVALID_SOCKET)
     {
-        std::cout << "[ERROR] SOCKET FAILED\n";
+        std::cout << "SOCKET FAILED\n";
         SSL_CTX_free(ctx);
         return;
     }
@@ -298,7 +279,7 @@ void quote_session()
 
     if (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) < 0)
     {
-        std::cout << "[ERROR] CONNECT FAILED\n";
+        std::cout << "CONNECT FAILED\n";
         closesocket(sock);
         SSL_CTX_free(ctx);
         return;
@@ -309,7 +290,7 @@ void quote_session()
 
     if (SSL_connect(ssl) <= 0)
     {
-        std::cout << "[ERROR] SSL HANDSHAKE FAILED\n";
+        std::cout << "SSL HANDSHAKE FAILED\n";
         ERR_print_errors_fp(stderr);
         SSL_free(ssl);
         closesocket(sock);
@@ -319,10 +300,9 @@ void quote_session()
 
     std::cout << "[FIX] SSL CONNECTED\n";
 
-    // FIXED: Use corrected logon with sub_id parameter
-    std::string logon = build_logon(seq++, "QUOTE");
+    std::string logon = build_logon(seq++);
     SSL_write(ssl, logon.c_str(), logon.size());
-    std::cout << "[FIX] LOGON SENT (QUOTE session)\n";
+    std::cout << "[FIX] LOGON SENT\n";
 
     char buffer[8192];
     while (g_running)
@@ -336,31 +316,28 @@ void quote_session()
 
         buffer[n] = 0;
         std::string msg(buffer, n);
+        // DEBUG: Show ALL FIX messages received
+        std::cout << "[FIX DEBUG] Received " << n << " bytes:" << std::endl;
+        std::cout << msg << std::endl;
+        std::cout << "---" << std::endl;
 
-        // Handle Logon Response (35=A)
         if (msg.find("35=A") != std::string::npos)
         {
             std::cout << "[FIX] LOGON ACCEPTED\n";
-            
-            // FIXED: Send security list request with 559=0
             std::string req = build_security_list_req(seq++);
+            std::cout << "[FIX] SECURITY LIST REQUEST SENT\n";
             SSL_write(ssl, req.c_str(), req.size());
-            std::cout << "[FIX] SECURITY LIST REQUEST SENT (559=0)\n";
         }
 
-        // Handle Security List (35=y)
         if (msg.find("35=y") != std::string::npos)
         {
             std::cout << "[FIX] SECURITY LIST RECEIVED\n";
-            
-            // FIXED: Send market data request with correct group ordering
             std::string md = build_marketdata_req(seq++);
             SSL_write(ssl, md.c_str(), md.size());
             std::cout << "[FIX] MARKET DATA REQUEST SENT FOR XAUUSD/XAGUSD\n";
         }
 
-        // Handle Market Data Snapshot (35=W) or Incremental (35=X)
-        if (msg.find("35=W") != std::string::npos || msg.find("35=X") != std::string::npos)
+        if (msg.find("35=W") != std::string::npos)
         {
             size_t pos = 0;
             std::string sym;
@@ -399,8 +376,8 @@ void quote_session()
             g_telemetry.Update(
                 xau_bid, xau_ask,
                 xag_bid, xag_ask,
-                0.0, 0.0,  // PnL
-                0.0, 0.0, 0.0,  // RTT
+                0.0, 0.0,  // PnL (calculate from your strategy)
+                0.0, 0.0, 0.0,  // RTT (add latency tracking)
                 "NORMAL", "CONNECTED",
                 "NONE", "NONE"
             );
@@ -408,7 +385,6 @@ void quote_session()
             print_prices();
         }
 
-        // FIXED: Handle Test Request / Heartbeat (35=1) with proper response
         if (msg.find("35=1") != std::string::npos)
         {
             size_t p = msg.find("112=");
@@ -417,24 +393,19 @@ void quote_session()
                 size_t end = msg.find("\x01", p);
                 std::string testID = msg.substr(p + 4, end - (p + 4));
 
-                // Send proper heartbeat response
-                std::string hb = build_heartbeat(seq++, testID, "QUOTE");
-                SSL_write(ssl, hb.c_str(), hb.size());
-                std::cout << "[FIX] HEARTBEAT SENT (TestReqID=" << testID << ")\n";
-            }
-        }
+                std::stringstream hb;
+                hb << "35=0\x01"
+                   << "49=" << g_cfg.sender << "\x01"
+                   << "56=" << g_cfg.target << "\x01"
+                   << "50=QUOTE\x01"
+                   << "57=QUOTE\x01"
+                   << "34=" << seq++ << "\x01"
+                   << "52=" << timestamp() << "\x01"
+                   << "112=" << testID << "\x01";
 
-        // Handle Reject (35=3)
-        if (msg.find("35=3") != std::string::npos)
-        {
-            size_t text_pos = msg.find("58=");
-            std::string reject_text = "Unknown";
-            if (text_pos != std::string::npos)
-            {
-                size_t end = msg.find("\x01", text_pos);
-                reject_text = msg.substr(text_pos + 3, end - (text_pos + 3));
+                std::string reply = wrap_fix(hb.str());
+                SSL_write(ssl, reply.c_str(), reply.size());
             }
-            std::cout << "[FIX ERROR] REJECT RECEIVED: " << reject_text << "\n";
         }
     }
 
