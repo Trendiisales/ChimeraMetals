@@ -367,6 +367,7 @@ void quote_loop(FixSession& session)
                 pos = pxEnd;
             }
 
+            std::cout << "[DEBUG] Symbol ID: " << symbolId << " bid=" << bid << " ask=" << ask << "\n";
             if (symbolId == 41) {
                 g_xau_bid = bid;
                 g_xau_ask = ask;
