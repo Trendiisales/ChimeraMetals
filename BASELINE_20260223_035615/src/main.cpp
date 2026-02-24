@@ -311,27 +311,41 @@ void quote_loop(FixSession& session)
         }
 
         if (msg.find("35=W") != std::string::npos || msg.find("35=X") != std::string::npos) {
-            size_t pos = 0;
-            std::string sym;
+            int symbolId = 0;
             
-            size_t sym_pos = msg.find("55=");
-            if (sym_pos != std::string::npos) {
-                size_t sym_end = msg.find("\x01", sym_pos);
-                sym = msg.substr(sym_pos + 3, sym_end - (sym_pos + 3));
+            size_t pos55 = msg.find("55=");
+            if (pos55 != std::string::npos) {
+                size_t end = msg.find("\x01", pos55);
+                symbolId = std::stoi(msg.substr(pos55 + 3, end - (pos55 + 3)));
             }
 
+            double bid = 0.0;
+            double ask = 0.0;
+
+            size_t pos = 0;
             while ((pos = msg.find("269=", pos)) != std::string::npos) {
                 char type = msg[pos + 4];
-                size_t price_pos = msg.find("270=", pos);
-                if (price_pos != std::string::npos) {
-                    size_t price_end = msg.find("\x01", price_pos);
-                    std::string price_str = msg.substr(price_pos + 4, price_end - (price_pos + 4));
-                    double price = std::stod(price_str);
+                size_t pxPos = msg.find("270=", pos);
+                if (pxPos == std::string::npos) break;
+                
+                size_t pxEnd = msg.find("\x01", pxPos);
+                double price = std::stod(msg.substr(pxPos + 4, pxEnd - (pxPos + 4)));
 
-                    if (type == '0') g_bid[sym] = price;
-                    else if (type == '1') g_ask[sym] = price;
-                }
-                pos++;
+                if (type == '0') bid = price;
+                else if (type == '1') ask = price;
+                
+                pos = pxEnd;
+            }
+
+            if (symbolId == 41) {
+                g_bid["XAUUSD"] = bid;
+                g_ask["XAUUSD"] = ask;
+                std::cout << "[QUOTE] XAUUSD: " << std::fixed << std::setprecision(2) << bid << " / " << ask << "\n";
+            }
+            else if (symbolId == 42) {
+                g_bid["XAGUSD"] = bid;
+                g_ask["XAGUSD"] = ask;
+                std::cout << "[QUOTE] XAGUSD: " << std::fixed << std::setprecision(2) << bid << " / " << ask << "\n";
             }
 
             double xau_bid = g_bid.count("XAUUSD") ? g_bid["XAUUSD"] : 0.0;
@@ -340,8 +354,6 @@ void quote_loop(FixSession& session)
             double xag_ask = g_ask.count("XAGUSD") ? g_ask["XAGUSD"] : 0.0;
 
             g_telemetry.Update(xau_bid, xau_ask, xag_bid, xag_ask, 0.0, 0.0, 0.0, 0.0, 0.0, "NORMAL", "CONNECTED", "NONE", "NONE");
-
-            std::cout << "[QUOTE] XAUUSD: " << std::fixed << std::setprecision(2) << xau_bid << " / " << xau_ask << "\n";
         }
 
         if (msg.find("35=1") != std::string::npos) {
