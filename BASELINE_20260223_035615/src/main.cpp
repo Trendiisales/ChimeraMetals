@@ -265,6 +265,7 @@ void print_prices()
     std::cout << "===================\n\n";
 }
 
+void trade_session();
 void quote_session()
 {
     int seq = 1;
