@@ -173,7 +173,7 @@ std::string build_logon(int seq, const std::string& sub_id)
     std::stringstream body;
 
     body << "35=A\x01"
-         << "49=" << g_cfg.sender << "\x01"
+         << "49=" << g_cfg.sender << ".TRADE\x01"
          << "56=" << g_cfg.target << "\x01"
          << "50=" << sub_id << "\x01"
          << "57=" << sub_id << "\x01"
@@ -199,7 +199,7 @@ std::string build_trade_logon(int seq)
     std::stringstream body;
 
     body << "35=A\x01"
-         << "49=" << g_cfg.sender << "\x01"
+         << "49=" << g_cfg.sender << ".TRADE\x01"
          << "56=" << g_cfg.target << "\x01"
          << "50=TRADE\x01"
          << "57=QUOTE\x01"
@@ -216,7 +216,7 @@ std::string build_security_list_req(int seq)
 {
     std::stringstream body;
     body << "35=x\x01"
-         << "49=" << g_cfg.sender << "\x01"
+         << "49=" << g_cfg.sender << ".TRADE\x01"
          << "56=" << g_cfg.target << "\x01"
          << "50=QUOTE\x01"
          << "57=QUOTE\x01"
@@ -232,7 +232,7 @@ std::string build_marketdata_req(int seq)
 {
     std::stringstream body;
     body << "35=V\x01"
-         << "49=" << g_cfg.sender << "\x01"
+         << "49=" << g_cfg.sender << ".TRADE\x01"
          << "56=" << g_cfg.target << "\x01"
          << "50=QUOTE\x01"
          << "57=QUOTE\x01"
@@ -256,7 +256,7 @@ std::string build_heartbeat(int seq, const std::string& test_id, const std::stri
 {
     std::stringstream body;
     body << "35=0\x01"
-         << "49=" << g_cfg.sender << "\x01"
+         << "49=" << g_cfg.sender << ".TRADE\x01"
          << "56=" << g_cfg.target << "\x01"
          << "50=" << sub_id << "\x01"
          << "57=" << sub_id << "\x01"
