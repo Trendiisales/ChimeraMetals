@@ -290,6 +290,7 @@ void quote_loop(FixSession& session)
         }
 
         buffer[n] = 0;
+        std::cout << "[DEBUG] RAW: " << msg << "\n---\n";
         std::string msg(buffer, n);
 
         if (msg.find("35=A") != std::string::npos) {
@@ -375,6 +376,7 @@ void trade_loop(FixSession& session)
         }
 
         buffer[n] = 0;
+        std::cout << "[DEBUG] RAW: " << msg << "\n---\n";
         std::string msg(buffer, n);
 
         if (msg.find("35=A") != std::string::npos)
