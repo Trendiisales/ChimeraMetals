@@ -13,6 +13,7 @@
 #include <ctime>
 #include <fstream>
 #include <map>
+#include <chrono>
 
 #include "TelemetryWriter.hpp"
 
@@ -51,6 +52,9 @@ double g_xau_bid = 0.0;
 double g_xau_ask = 0.0;
 double g_xag_bid = 0.0;
 double g_xag_ask = 0.0;
+
+// Console print throttling
+static std::chrono::steady_clock::time_point g_last_print = std::chrono::steady_clock::now();
 TelemetryWriter g_telemetry;
 
 // ============================================================================
@@ -196,7 +200,7 @@ std::string build_trade_logon(int seq)
          << "49=" << g_cfg.sender << "\x01"
          << "56=" << g_cfg.target << "\x01"
          << "50=TRADE\x01"
-         << "57=TRADE\x01"
+         << "57=QUOTE\x01"
          << "34=" << seq << "\x01"
          << "52=" << timestamp() << "\x01"
          << "98=0\x01"
@@ -367,17 +371,25 @@ void quote_loop(FixSession& session)
                 g_xau_ask = ask;
                 g_bid["XAUUSD"] = bid;
                 g_ask["XAUUSD"] = ask;
-                std::cout << "[QUOTE] XAUUSD: " << std::fixed << std::setprecision(2) << bid << " / " << ask << "\n";
             }
             else if (symbolId == 42) {
                 g_xag_bid = bid;
                 g_xag_ask = ask;
                 g_bid["XAGUSD"] = bid;
                 g_ask["XAGUSD"] = ask;
-                std::cout << "[QUOTE] XAGUSD: " << std::fixed << std::setprecision(2) << bid << " / " << ask << "\n";
             }
 
             g_telemetry.Update(g_xau_bid, g_xau_ask, g_xag_bid, g_xag_ask, 0.0, 0.0, 0.0, 0.0, 0.0, "NORMAL", "CONNECTED", "NONE", "NONE");
+
+            // Throttled console output
+            auto now = std::chrono::steady_clock::now();
+            auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - g_last_print).count();
+            if (elapsed >= 5) {
+                std::cout << "\n=== MARKET DATA ===\n";
+                std::cout << "XAUUSD: " << std::fixed << std::setprecision(2) << g_xau_bid << " / " << g_xau_ask << "\n";
+                std::cout << "XAGUSD: " << std::fixed << std::setprecision(2) << g_xag_bid << " / " << g_xag_ask << "\n";
+                g_last_print = now;
+            }
         }
 
         if (msg.find("35=1") != std::string::npos) {
