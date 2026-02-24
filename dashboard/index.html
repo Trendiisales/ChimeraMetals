@@ -169,7 +169,7 @@
         <header>
             <h1>CHIMERAMETALS V3</h1>
             <div class="subtitle">INSTITUTIONAL GRADE TRADING DESK</div>
-            <div class="status-badge">? LIVE PRODUCTION</div>
+            <div class="status-badge">âš¡ LIVE PRODUCTION</div>
         </header>
         <div class="grid">
             <div class="panel">
@@ -229,25 +229,30 @@
                 <div class="panel-header">STRATEGY STATUS</div>
                 <div class="metric">
                     <span class="label">RISK MODE</span>
-                    <span class="value positive" id="risk-mode">—</span>
+                    <span class="value positive" id="risk-mode">â€”</span>
                 </div>
                 <div class="metric">
                     <span class="label">REGIME</span>
-                    <span class="value neutral" id="regime">—</span>
+                    <span class="value neutral" id="regime">â€”</span>
                 </div>
                 <div class="metric">
                     <span class="label">HFT SIGNAL</span>
-                    <span class="value" id="hft-signal">—</span>
+                    <span class="value" id="hft-signal">â€”</span>
                 </div>
                 <div class="metric">
                     <span class="label">STRUCTURE SIGNAL</span>
-                    <span class="value" id="structure-signal">—</span>
+                    <span class="value" id="structure-signal">â€”</span>
                 </div>
             </div>
         </div>
     </div>
     <script>
-        const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + '185.167.119.59:8080');
+        // FIXED: Force ws:// protocol (not wss://) since server doesn't support SSL
+        // Use window.location.hostname to work with any IP/localhost
+        const wsUrl = 'ws://' + (window.location.hostname || '185.167.119.59') + ':8080';
+        console.log('Connecting to:', wsUrl);
+        const ws = new WebSocket(wsUrl);
+        
         const statusDot = document.getElementById('statusDot');
         const statusText = document.getElementById('statusText');
         const xauCanvas = document.getElementById('xau-sparkline');
@@ -257,6 +262,7 @@
         const xauHistory = [];
         const xagHistory = [];
         const maxHistory = 50;
+        
         function drawSparkline(ctx, data, canvas) {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             if (data.length < 2) return;
@@ -275,45 +281,62 @@
             });
             ctx.stroke();
         }
+        
         ws.onopen = () => {
             statusDot.className = 'status-dot connected';
             statusText.textContent = 'LIVE';
+            console.log('WebSocket connected');
         };
+        
         ws.onclose = () => {
             statusDot.className = 'status-dot disconnected';
             statusText.textContent = 'DISCONNECTED';
+            console.log('WebSocket disconnected');
         };
+        
+        ws.onerror = (error) => {
+            console.error('WebSocket error:', error);
+        };
+        
         ws.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            document.getElementById('xau-bid').textContent = '$' + data.xau_bid.toFixed(2);
-            document.getElementById('xau-ask').textContent = '$' + data.xau_ask.toFixed(2);
-            document.getElementById('xag-bid').textContent = '$' + data.xag_bid.toFixed(2);
-            document.getElementById('xag-ask').textContent = '$' + data.xag_ask.toFixed(2);
-            const hftPnl = document.getElementById('hft-pnl');
-            const stratPnl = document.getElementById('strategy-pnl');
-            hftPnl.textContent = '$' + data.hft_pnl.toFixed(2);
-            stratPnl.textContent = '$' + data.strategy_pnl.toFixed(2);
-            hftPnl.className = 'value large ' + (data.hft_pnl >= 0 ? 'positive' : 'negative');
-            stratPnl.className = 'value large ' + (data.strategy_pnl >= 0 ? 'positive' : 'negative');
-            document.getElementById('hft-bar').style.width = Math.min(100, Math.max(0, 50 + data.hft_pnl / 4)) + '%';
-            document.getElementById('strategy-bar').style.width = Math.min(100, Math.max(0, 50 + data.strategy_pnl / 4)) + '%';
-            document.getElementById('rtt-last').textContent = data.rtt_last.toFixed(2) + 'ms';
-            document.getElementById('rtt-p50').textContent = data.rtt_p50.toFixed(2) + 'ms';
-            document.getElementById('rtt-p95').textContent = data.rtt_p95.toFixed(2) + 'ms';
-            document.getElementById('risk-mode').textContent = data.risk_mode;
-            document.getElementById('regime').textContent = data.regime;
-            document.getElementById('hft-signal').textContent = data.hft_signal;
-            document.getElementById('structure-signal').textContent = data.structure_signal;
-            xauHistory.push(data.xau_bid);
-            xagHistory.push(data.xag_bid);
-            if (xauHistory.length > maxHistory) xauHistory.shift();
-            if (xagHistory.length > maxHistory) xagHistory.shift();
-            drawSparkline(xauCtx, xauHistory, xauCanvas);
-            drawSparkline(xagCtx, xagHistory, xagCanvas);
+            try {
+                const data = JSON.parse(event.data);
+                console.log('Received data:', data);
+                
+                document.getElementById('xau-bid').textContent = '$' + data.xau_bid.toFixed(2);
+                document.getElementById('xau-ask').textContent = '$' + data.xau_ask.toFixed(2);
+                document.getElementById('xag-bid').textContent = '$' + data.xag_bid.toFixed(2);
+                document.getElementById('xag-ask').textContent = '$' + data.xag_ask.toFixed(2);
+                
+                const hftPnl = document.getElementById('hft-pnl');
+                const stratPnl = document.getElementById('strategy-pnl');
+                hftPnl.textContent = '$' + data.hft_pnl.toFixed(2);
+                stratPnl.textContent = '$' + data.strategy_pnl.toFixed(2);
+                hftPnl.className = 'value large ' + (data.hft_pnl >= 0 ? 'positive' : 'negative');
+                stratPnl.className = 'value large ' + (data.strategy_pnl >= 0 ? 'positive' : 'negative');
+                
+                document.getElementById('hft-bar').style.width = Math.min(100, Math.max(0, 50 + data.hft_pnl / 4)) + '%';
+                document.getElementById('strategy-bar').style.width = Math.min(100, Math.max(0, 50 + data.strategy_pnl / 4)) + '%';
+                
+                document.getElementById('rtt-last').textContent = data.rtt_last.toFixed(2) + 'ms';
+                document.getElementById('rtt-p50').textContent = data.rtt_p50.toFixed(2) + 'ms';
+                document.getElementById('rtt-p95').textContent = data.rtt_p95.toFixed(2) + 'ms';
+                
+                document.getElementById('risk-mode').textContent = data.risk_mode;
+                document.getElementById('regime').textContent = data.regime;
+                document.getElementById('hft-signal').textContent = data.hft_signal;
+                document.getElementById('structure-signal').textContent = data.structure_signal;
+                
+                xauHistory.push(data.xau_bid);
+                xagHistory.push(data.xag_bid);
+                if (xauHistory.length > maxHistory) xauHistory.shift();
+                if (xagHistory.length > maxHistory) xagHistory.shift();
+                drawSparkline(xauCtx, xauHistory, xauCanvas);
+                drawSparkline(xagCtx, xagHistory, xagCanvas);
+            } catch (e) {
+                console.error('Error parsing data:', e);
+            }
         };
     </script>
 </body>
 </html>
-
-
-

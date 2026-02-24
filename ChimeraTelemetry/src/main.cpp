@@ -7,8 +7,86 @@
 #include <thread>
 #include <vector>
 #include <string>
+#include <cstdio>
+#include <atomic>
+#include <cstdint>
+#include <cstring>
 
 #pragma comment(lib,"ws2_32.lib")
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SHARED MEMORY STRUCTURE (must match TelemetrySnapshot.hpp)
+// ═══════════════════════════════════════════════════════════════════════════
+
+struct TelemetrySnapshot
+{
+    std::atomic<uint64_t> sequence;
+
+    double xau_bid;
+    double xau_ask;
+    double xag_bid;
+    double xag_ask;
+
+    double xau_vwap;
+    double xau_ema_fast;
+    double xau_ema_slow;
+
+    double xag_vwap;
+    double xag_ema_fast;
+    double xag_ema_slow;
+
+    double hft_pnl;
+    double strategy_pnl;
+
+    double fix_rtt_last;
+    double fix_rtt_p50;
+    double fix_rtt_p95;
+
+    double vps_latency;
+
+    char hft_regime[32];
+    char strategy_regime[32];
+
+    char hft_trigger[32];
+    char strategy_trigger[32];
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SHARED MEMORY READER
+// ═══════════════════════════════════════════════════════════════════════════
+
+static TelemetrySnapshot* g_snapshot = nullptr;
+
+bool SnapshotInit()
+{
+    HANDLE hMap = OpenFileMappingA(FILE_MAP_READ, FALSE, "Global\\ChimeraTelemetrySharedMemory");
+    if (!hMap) return false;
+
+    g_snapshot = (TelemetrySnapshot*)MapViewOfFile(hMap, FILE_MAP_READ, 0, 0, sizeof(TelemetrySnapshot));
+    return g_snapshot != nullptr;
+}
+
+bool SnapshotRead(TelemetrySnapshot& out)
+{
+    if (!g_snapshot) return false;
+
+    uint64_t seq1;
+    uint64_t seq2;
+
+    do
+    {
+        seq1 = g_snapshot->sequence.load(std::memory_order_acquire);
+        std::memcpy(&out, g_snapshot, sizeof(TelemetrySnapshot));
+        seq2 = g_snapshot->sequence.load(std::memory_order_acquire);
+
+    } while (seq1 != seq2);
+
+    return true;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// WEBSOCKET SERVER
+// ═══════════════════════════════════════════════════════════════════════════
 
 static const char* MUTEX_NAME="Global\\ChimeraTelemetrySingleton";
 static const char* PORT="8080";
@@ -47,11 +125,23 @@ std::string generate_accept_key(const std::string& key){
 }
 
 std::string load_dashboard(){
-    std::ifstream file("dashboard\\index.html",std::ios::binary);
-    if(!file.is_open()) return "<h1>Dashboard Missing</h1>";
-    std::ostringstream ss;
-    ss<<file.rdbuf();
-    return ss.str();
+    // Try multiple paths for dashboard
+    const char* paths[] = {
+        "dashboard\\index.html",
+        "..\\dashboard\\index.html",
+        "C:\\ChimeraMetals\\dashboard\\index.html"
+    };
+    
+    for(const char* path : paths){
+        std::ifstream file(path,std::ios::binary);
+        if(file.is_open()){
+            std::ostringstream ss;
+            ss<<file.rdbuf();
+            return ss.str();
+        }
+    }
+    
+    return "<h1>Dashboard Missing</h1><p>Searched multiple paths but couldn't find index.html</p>";
 }
 
 void send_text_frame(SOCKET s,const std::string& msg){
@@ -77,11 +167,40 @@ void send_text_frame(SOCKET s,const std::string& msg){
 }
 
 void websocket_loop(SOCKET s){
+    TelemetrySnapshot snap;
+    char json_buffer[1024];
+    
     while(true){
-        // Fixed JSON - all quotes properly escaped
-        std::string json_data = R"({"xau_bid":0,"xau_ask":0,"xag_bid":0,"xag_ask":0,"hft_pnl":0,"strategy_pnl":0,"rtt_last":0,"rtt_p50":0,"rtt_p95":0,"risk_mode":"NORMAL","regime":"OK","hft_signal":"NONE","structure_signal":"NONE"})";
-        send_text_frame(s,json_data);
-        Sleep(1000);
+        // Read from shared memory
+        bool hasData = SnapshotRead(snap);
+        
+        if(hasData){
+            // Build JSON from REAL data
+            snprintf(json_buffer, sizeof(json_buffer),
+                R"({"xau_bid":%.2f,"xau_ask":%.2f,"xag_bid":%.2f,"xag_ask":%.2f,"hft_pnl":%.2f,"strategy_pnl":%.2f,"rtt_last":%.2f,"rtt_p50":%.2f,"rtt_p95":%.2f,"risk_mode":"%s","regime":"%s","hft_signal":"%s","structure_signal":"%s"})",
+                snap.xau_bid,
+                snap.xau_ask,
+                snap.xag_bid,
+                snap.xag_ask,
+                snap.hft_pnl,
+                snap.strategy_pnl,
+                snap.fix_rtt_last,
+                snap.fix_rtt_p50,
+                snap.fix_rtt_p95,
+                snap.hft_regime,
+                snap.strategy_regime,
+                snap.hft_trigger,
+                snap.strategy_trigger
+            );
+        }else{
+            // Fallback to dummy data if shared memory not available
+            snprintf(json_buffer, sizeof(json_buffer),
+                R"({"xau_bid":0,"xau_ask":0,"xag_bid":0,"xag_ask":0,"hft_pnl":0,"strategy_pnl":0,"rtt_last":0,"rtt_p50":0,"rtt_p95":0,"risk_mode":"WAITING","regime":"DISCONNECTED","hft_signal":"NONE","structure_signal":"NONE"})"
+            );
+        }
+        
+        send_text_frame(s, json_buffer);
+        Sleep(100); // 10 Hz update rate (faster than original 1 Hz)
     }
 }
 
@@ -137,12 +256,18 @@ void handle_client(SOCKET client){
 }
 
 int WINAPI WinMain(HINSTANCE,HINSTANCE,LPSTR,int){
+    // Singleton check
     HANDLE hMutex=CreateMutexA(NULL,TRUE,MUTEX_NAME);
     if(!hMutex||GetLastError()==ERROR_ALREADY_EXISTS) return 0;
 
+    // Initialize shared memory connection
+    bool sharedMemOk = SnapshotInit();
+    
+    // Initialize Winsock
     WSADATA wsa;
     WSAStartup(MAKEWORD(2,2),&wsa);
 
+    // Setup server socket
     addrinfo hints={},*result=nullptr;
     hints.ai_family=AF_INET;
     hints.ai_socktype=SOCK_STREAM;
@@ -155,6 +280,7 @@ int WINAPI WinMain(HINSTANCE,HINSTANCE,LPSTR,int){
     bind(server,result->ai_addr,result->ai_addrlen);
     listen(server,SOMAXCONN);
 
+    // Accept connections
     while(true){
         SOCKET client=accept(server,NULL,NULL);
         std::thread(handle_client,client).detach();
