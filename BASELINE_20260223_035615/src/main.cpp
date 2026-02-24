@@ -187,6 +187,25 @@ std::string build_logon(int seq, const std::string& sub_id)
     return wrap_fix(body.str());
 }
 
+
+std::string build_trade_logon(int seq)
+{
+    std::stringstream body;
+
+    body << "35=A\x01"
+         << "49=" << g_cfg.sender << "\x01"
+         << "56=" << g_cfg.target << "\x01"
+         << "50=TRADE\x01"
+         << "57=TRADE\x01"
+         << "34=" << seq << "\x01"
+         << "52=" << timestamp() << "\x01"
+         << "98=0\x01"
+         << "108=30\x01"
+         << "553=" << g_cfg.username << "\x01"
+         << "554=" << g_cfg.password << "\x01";
+
+    return wrap_fix(body.str());
+}
 std::string build_security_list_req(int seq)
 {
     std::stringstream body;
@@ -490,7 +509,7 @@ int main(int argc, char* argv[])
     }
     std::cout << "[TRADE] SSL CONNECTED\n";
 
-    std::string tlogon = build_logon(trade.seq++, "TRADE");
+    std::string tlogon = build_trade_logon(trade.seq++);
     std::cout << "[DEBUG] TRADE LOGON: " << tlogon << "\n";
     SSL_write(trade.ssl, tlogon.c_str(), tlogon.size());
     std::cout << "[TRADE] LOGON SENT\n\n";
