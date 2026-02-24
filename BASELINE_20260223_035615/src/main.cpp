@@ -201,7 +201,7 @@ std::string build_trade_logon(int seq)
     body << "35=A\x01"
          << "49=" << g_cfg.sender << "\x01"
          << "56=" << g_cfg.target << "\x01"
-         << "50=TRADE\x01"
+         << "50=QUOTE\x01"
          << "57=QUOTE\x01"
          << "34=" << seq << "\x01"
          << "52=" << timestamp() << "\x01"
