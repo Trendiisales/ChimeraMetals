@@ -247,6 +247,7 @@ void print_prices()
 void quote_session()
 {
     int seq = 1;
+    std::cout << "[FIX] Attempting connection to " << g_cfg.host << ":" << g_cfg.quote_port << "...\n";
 
     SSL_CTX* ctx = SSL_CTX_new(TLS_client_method());
     if (!ctx)
@@ -320,6 +321,7 @@ void quote_session()
         {
             std::cout << "[FIX] LOGON ACCEPTED\n";
             std::string req = build_security_list_req(seq++);
+            std::cout << "[FIX] SECURITY LIST REQUEST SENT\n";
             SSL_write(ssl, req.c_str(), req.size());
         }
 
@@ -328,6 +330,7 @@ void quote_session()
             std::cout << "[FIX] SECURITY LIST RECEIVED\n";
             std::string md = build_marketdata_req(seq++);
             SSL_write(ssl, md.c_str(), md.size());
+            std::cout << "[FIX] MARKET DATA REQUEST SENT FOR XAUUSD/XAGUSD\n";
         }
 
         if (msg.find("35=W") != std::string::npos)
