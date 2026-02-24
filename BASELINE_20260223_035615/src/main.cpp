@@ -320,7 +320,6 @@ void quote_loop(FixSession& session)
 
         buffer[n] = 0;
         std::string msg(buffer, n);
-        std::cout << "[DEBUG] RAW: " << msg << "\n---\n";
 
         if (msg.find("35=A") != std::string::npos) {
             std::cout << "[QUOTE] LOGON ACCEPTED\n";
@@ -425,7 +424,6 @@ void trade_loop(FixSession& session)
 
         buffer[n] = 0;
         std::string msg(buffer, n);
-        std::cout << "[DEBUG] RAW: " << msg << "\n---\n";
 
         if (msg.find("35=A") != std::string::npos)
             std::cout << "[TRADE] LOGON ACCEPTED\n";
@@ -514,7 +512,8 @@ int main(int argc, char* argv[])
     std::cout << "[QUOTE] LOGON SENT\n\n";
 
     // TRADE SESSION
-    trade.ssl = connect_ssl(g_cfg.host, g_cfg.port);
+    std::cout << "[TRADE] Connecting to: " << g_cfg.host << ":" << g_cfg.trade_port << "\n";
+    trade.ssl = connect_ssl(g_cfg.host, g_cfg.trade_port);
     if (!trade.ssl) {
         std::cout << "[ERROR] TRADE SSL FAILED\n";
         return 1;
