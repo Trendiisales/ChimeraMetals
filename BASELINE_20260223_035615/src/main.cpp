@@ -18,14 +18,16 @@
 
 #pragma comment(lib, "ws2_32.lib")
 
-// Global singleton mutex - prevents multiple instances
+// ============================================================================
+// IMMUTABLE PRODUCTION CODE - DO NOT MODIFY EXCEPT FOR LIVE MIGRATION
+// ============================================================================
+
 constexpr const char* SINGLETON_MUTEX_NAME = "Global\\ChimeraMetals_BASELINE_SingleInstance";
 HANDLE g_singleton_mutex = NULL;
 
 struct Config {
     std::string host;
-    int quote_port = 0;
-    int trade_port = 0;
+    int port = 0;
     std::string sender;
     std::string target;
     std::string username;
@@ -33,30 +35,30 @@ struct Config {
     int heartbeat = 30;
 };
 
+struct FixSession {
+    SSL* ssl = nullptr;
+    int seq = 1;
+    std::string sub_id;
+};
+
 Config g_cfg;
 std::atomic<bool> g_running(true);
-
-std::map<int,std::string> g_idToName;
-std::map<std::string,double> g_bid;
-std::map<std::string,double> g_ask;
-
-// Global telemetry writer
+std::map<std::string, double> g_bid;
+std::map<std::string, double> g_ask;
 TelemetryWriter g_telemetry;
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
 
 bool CheckSingleInstance()
 {
     g_singleton_mutex = CreateMutexA(NULL, TRUE, SINGLETON_MUTEX_NAME);
-    
-    if (g_singleton_mutex == NULL) {
-        return false;
-    }
-    
-    if (GetLastError() == ERROR_ALREADY_EXISTS) {
-        CloseHandle(g_singleton_mutex);
+    if (g_singleton_mutex == NULL || GetLastError() == ERROR_ALREADY_EXISTS) {
+        if (g_singleton_mutex) CloseHandle(g_singleton_mutex);
         g_singleton_mutex = NULL;
         return false;
     }
-    
     return true;
 }
 
@@ -68,35 +70,19 @@ bool LaunchTelemetry()
     si.dwFlags = STARTF_USESHOWWINDOW;
     si.wShowWindow = SW_HIDE;
 
-    // Try multiple possible paths
     const char* paths[] = {
         "..\\..\\ChimeraTelemetry\\build\\Release\\ChimeraTelemetry.exe",
-        "..\\ChimeraTelemetry\\build\\Release\\ChimeraTelemetry.exe",
         "C:\\ChimeraMetals\\ChimeraTelemetry\\build\\Release\\ChimeraTelemetry.exe"
     };
 
     for (const char* path : paths) {
-        BOOL ok = CreateProcessA(
-            path,
-            NULL,
-            NULL,
-            NULL,
-            FALSE,
-            CREATE_NO_WINDOW | DETACHED_PROCESS,
-            NULL,
-            NULL,
-            &si,
-            &pi
-        );
-
-        if (ok) {
+        if (CreateProcessA(path, NULL, NULL, NULL, FALSE, CREATE_NO_WINDOW | DETACHED_PROCESS, NULL, NULL, &si, &pi)) {
             CloseHandle(pi.hProcess);
             CloseHandle(pi.hThread);
-            std::cout << "[OK] ChimeraTelemetry launched from: " << path << "\n";
+            std::cout << "[OK] ChimeraTelemetry launched\n";
             return true;
         }
     }
-    
     return false;
 }
 
@@ -115,28 +101,21 @@ bool load_config(const std::string& path)
     std::string line;
     bool in_fix = false;
 
-    while (std::getline(f, line))
-    {
+    while (std::getline(f, line)) {
         line = trim(line);
-        if (line.empty() || line[0] == '#')
-            continue;
-
+        if (line.empty() || line[0] == '#') continue;
         if (line == "[fix]") { in_fix = true; continue; }
         if (line[0] == '[' && line != "[fix]") { in_fix = false; continue; }
-
-        if (!in_fix)
-            continue;
+        if (!in_fix) continue;
 
         size_t eq = line.find('=');
-        if (eq == std::string::npos)
-            continue;
+        if (eq == std::string::npos) continue;
 
         std::string key = trim(line.substr(0, eq));
         std::string val = trim(line.substr(eq + 1));
 
         if (key == "host") g_cfg.host = val;
-        if (key == "port") g_cfg.quote_port = std::stoi(val);
-        if (key == "trade_port") g_cfg.trade_port = std::stoi(val);
+        if (key == "port") g_cfg.port = std::stoi(val);
         if (key == "sender_comp_id") g_cfg.sender = val;
         if (key == "target_comp_id") g_cfg.target = val;
         if (key == "username") g_cfg.username = val;
@@ -144,7 +123,7 @@ bool load_config(const std::string& path)
         if (key == "heartbeat_interval") g_cfg.heartbeat = std::stoi(val);
     }
 
-    return !g_cfg.host.empty() && g_cfg.quote_port != 0;
+    return !g_cfg.host.empty() && g_cfg.port != 0;
 }
 
 std::string timestamp()
@@ -173,7 +152,10 @@ std::string wrap_fix(const std::string& body)
     return msg.str();
 }
 
-// FIXED: Correct logon for cTrader
+// ============================================================================
+// FIX MESSAGE BUILDERS
+// ============================================================================
+
 std::string build_logon(int seq, const std::string& sub_id)
 {
     std::stringstream body;
@@ -186,14 +168,13 @@ std::string build_logon(int seq, const std::string& sub_id)
          << "52=" << timestamp() << "\x01"
          << "98=0\x01"
          << "108=" << g_cfg.heartbeat << "\x01"
-         << "141=Y\x01"                     // ResetSeqNumFlag - send ONLY on clean start
+         << "141=Y\x01"
          << "553=" << g_cfg.username << "\x01"
          << "554=" << g_cfg.password << "\x01";
 
     return wrap_fix(body.str());
 }
 
-// FIXED: Security list request with 559=0 for cTrader
 std::string build_security_list_req(int seq)
 {
     std::stringstream body;
@@ -205,12 +186,11 @@ std::string build_security_list_req(int seq)
          << "34=" << seq << "\x01"
          << "52=" << timestamp() << "\x01"
          << "320=ListReq-" << seq << "\x01"
-         << "559=0\x01";          // FIXED: Was 559=1, must be 559=0 for cTrader
+         << "559=0\x01";
 
     return wrap_fix(body.str());
 }
 
-// FIXED: Market data request with correct group ordering
 std::string build_marketdata_req(int seq)
 {
     std::stringstream body;
@@ -222,20 +202,19 @@ std::string build_marketdata_req(int seq)
          << "34=" << seq << "\x01"
          << "52=" << timestamp() << "\x01"
          << "262=MDReq-" << seq << "\x01"
-         << "263=1\x01"        // Snapshot + Updates
-         << "264=1\x01"        // FIXED: Top of book only (was 0, FX requires 1)
-         << "265=1\x01"        // Incremental updates
-         << "267=2\x01"        // NoMDEntryTypes
-         << "269=0\x01"        // Bid
-         << "269=1\x01"        // Offer
-         << "146=2\x01"        // NoRelatedSym
+         << "263=1\x01"
+         << "264=1\x01"
+         << "265=1\x01"
+         << "267=2\x01"
+         << "269=0\x01"
+         << "269=1\x01"
+         << "146=2\x01"
          << "55=XAUUSD\x01"
          << "55=XAGUSD\x01";
 
     return wrap_fix(body.str());
 }
 
-// FIXED: Proper heartbeat response
 std::string build_heartbeat(int seq, const std::string& test_id, const std::string& sub_id)
 {
     std::stringstream body;
@@ -251,340 +230,139 @@ std::string build_heartbeat(int seq, const std::string& test_id, const std::stri
     return wrap_fix(body.str());
 }
 
-void print_prices()
+// ============================================================================
+// SSL CONNECTION
+// ============================================================================
+
+SSL* connect_ssl(const std::string& host, int port)
 {
-    std::cout << "\n=== MARKET DATA ===\n";
-    for (auto& p : g_bid)
-    {
-        std::string sym = p.first;
-        double b = g_bid[sym];
-        double a = g_ask[sym];
-        std::cout << sym << ": " << std::fixed << std::setprecision(2)
-                  << b << " / " << a << "\n";
-    }
-    std::cout << "===================\n\n";
-}
+    SSL_library_init();
+    SSL_load_error_strings();
 
-void trade_session();
-void quote_session()
-{
-    int seq = 1;
-    std::cout << "[FIX] Attempting connection to " << g_cfg.host << ":" << g_cfg.quote_port << "...\n";
+    const SSL_METHOD* method = TLS_client_method();
+    SSL_CTX* ctx = SSL_CTX_new(method);
+    if (!ctx) return nullptr;
 
-    SSL_CTX* ctx = SSL_CTX_new(TLS_client_method());
-    if (!ctx)
-    {
-        std::cout << "[ERROR] SSL CTX FAILED\n";
-        return;
-    }
-
-    struct hostent* he = gethostbyname(g_cfg.host.c_str());
-    if (!he)
-    {
-        std::cout << "[ERROR] HOST LOOKUP FAILED\n";
-        SSL_CTX_free(ctx);
-        return;
-    }
-
-    SOCKET sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock == INVALID_SOCKET)
-    {
-        std::cout << "[ERROR] SOCKET FAILED\n";
-        SSL_CTX_free(ctx);
-        return;
-    }
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock < 0) return nullptr;
 
     sockaddr_in addr{};
     addr.sin_family = AF_INET;
-    addr.sin_port = htons(g_cfg.quote_port);
-    memcpy(&addr.sin_addr, he->h_addr, he->h_length);
+    addr.sin_port = htons(port);
 
-    if (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) < 0)
-    {
-        std::cout << "[ERROR] CONNECT FAILED\n";
-        closesocket(sock);
-        SSL_CTX_free(ctx);
-        return;
-    }
+    hostent* he = gethostbyname(host.c_str());
+    if (!he) return nullptr;
+    
+    memcpy(&addr.sin_addr, he->h_addr_list[0], he->h_length);
+
+    if (connect(sock, (sockaddr*)&addr, sizeof(addr)) != 0)
+        return nullptr;
 
     SSL* ssl = SSL_new(ctx);
     SSL_set_fd(ssl, sock);
 
     if (SSL_connect(ssl) <= 0)
-    {
-        std::cout << "[ERROR] SSL HANDSHAKE FAILED\n";
-        ERR_print_errors_fp(stderr);
-        SSL_free(ssl);
-        closesocket(sock);
-        SSL_CTX_free(ctx);
-        return;
-    }
+        return nullptr;
 
-    std::cout << "[FIX] SSL CONNECTED\n";
+    return ssl;
+}
 
-    // FIXED: Use corrected logon with sub_id parameter
-    std::string logon = build_logon(seq++, "QUOTE");
-    SSL_write(ssl, logon.c_str(), logon.size());
-    std::cout << "[FIX] LOGON SENT (QUOTE session)\n";
+// ============================================================================
+// MESSAGE LOOPS
+// ============================================================================
 
+void quote_loop(FixSession& session)
+{
     char buffer[8192];
-    while (g_running)
-    {
-        int n = SSL_read(ssl, buffer, sizeof(buffer) - 1);
-        if (n <= 0)
-        {
-            std::cout << "[FIX] CONNECTION CLOSED\n";
+    bool security_list_sent = false;
+
+    while (g_running) {
+        int n = SSL_read(session.ssl, buffer, sizeof(buffer) - 1);
+        if (n <= 0) {
+            std::cout << "[QUOTE] CONNECTION CLOSED\n";
             break;
         }
 
         buffer[n] = 0;
         std::string msg(buffer, n);
 
-        // Handle Logon Response (35=A)
-        if (msg.find("35=A") != std::string::npos)
-        {
-            std::cout << "[FIX] LOGON ACCEPTED\n";
-            
-            // FIXED: Send security list request with 559=0
-            std::string req = build_security_list_req(seq++);
-            SSL_write(ssl, req.c_str(), req.size());
-            std::cout << "[FIX] SECURITY LIST REQUEST SENT (559=0)\n";
+        if (msg.find("35=A") != std::string::npos) {
+            std::cout << "[QUOTE] LOGON ACCEPTED\n";
+            if (!security_list_sent) {
+                std::string req = build_security_list_req(session.seq++);
+                SSL_write(session.ssl, req.c_str(), req.size());
+                std::cout << "[QUOTE] SECURITY LIST REQUEST SENT\n";
+                security_list_sent = true;
+            }
         }
 
-        // Handle Security List (35=y)
-        if (msg.find("35=y") != std::string::npos)
-        {
-            std::cout << "[FIX] SECURITY LIST RECEIVED\n";
-            
-            // FIXED: Send market data request with correct group ordering
-            std::string md = build_marketdata_req(seq++);
-            SSL_write(ssl, md.c_str(), md.size());
-            std::cout << "[FIX] MARKET DATA REQUEST SENT FOR XAUUSD/XAGUSD\n";
+        if (msg.find("35=y") != std::string::npos) {
+            std::cout << "[QUOTE] SECURITY LIST RECEIVED\n";
+            std::string md = build_marketdata_req(session.seq++);
+            SSL_write(session.ssl, md.c_str(), md.size());
+            std::cout << "[QUOTE] MARKET DATA REQUEST SENT\n";
         }
 
-        // Handle Market Data Snapshot (35=W) or Incremental (35=X)
-        // Debug: Check for market data messages
-        if (msg.find("35=V") != std::string::npos)
-            std::cout << "[FIX DEBUG] MarketDataRequest ACK detected\n";
-
-        if (msg.find("35=W") != std::string::npos)
-            std::cout << "[FIX DEBUG] Snapshot (35=W) received\n";
-
-        if (msg.find("35=X") != std::string::npos)
-            std::cout << "[FIX DEBUG] Incremental update (35=X) received\n";
-
-        if (msg.find("35=W") != std::string::npos || msg.find("35=X") != std::string::npos)
-        {
+        if (msg.find("35=W") != std::string::npos || msg.find("35=X") != std::string::npos) {
             size_t pos = 0;
             std::string sym;
             
             size_t sym_pos = msg.find("55=");
-            if (sym_pos != std::string::npos)
-            {
+            if (sym_pos != std::string::npos) {
                 size_t sym_end = msg.find("\x01", sym_pos);
                 sym = msg.substr(sym_pos + 3, sym_end - (sym_pos + 3));
             }
 
-            while ((pos = msg.find("269=", pos)) != std::string::npos)
-            {
+            while ((pos = msg.find("269=", pos)) != std::string::npos) {
                 char type = msg[pos + 4];
                 size_t price_pos = msg.find("270=", pos);
-                if (price_pos != std::string::npos)
-                {
+                if (price_pos != std::string::npos) {
                     size_t price_end = msg.find("\x01", price_pos);
                     std::string price_str = msg.substr(price_pos + 4, price_end - (price_pos + 4));
                     double price = std::stod(price_str);
 
-                    if (type == '0')
-                        g_bid[sym] = price;
-                    else if (type == '1')
-                        g_ask[sym] = price;
+                    if (type == '0') g_bid[sym] = price;
+                    else if (type == '1') g_ask[sym] = price;
                 }
                 pos++;
             }
 
-            // UPDATE TELEMETRY
             double xau_bid = g_bid.count("XAUUSD") ? g_bid["XAUUSD"] : 0.0;
             double xau_ask = g_ask.count("XAUUSD") ? g_ask["XAUUSD"] : 0.0;
             double xag_bid = g_bid.count("XAGUSD") ? g_bid["XAGUSD"] : 0.0;
             double xag_ask = g_ask.count("XAGUSD") ? g_ask["XAGUSD"] : 0.0;
 
-            g_telemetry.Update(
-                xau_bid, xau_ask,
-                xag_bid, xag_ask,
-                0.0, 0.0,  // PnL
-                0.0, 0.0, 0.0,  // RTT
-                "NORMAL", "CONNECTED",
-                "NONE", "NONE"
-            );
+            g_telemetry.Update(xau_bid, xau_ask, xag_bid, xag_ask, 0.0, 0.0, 0.0, 0.0, 0.0, "NORMAL", "CONNECTED", "NONE", "NONE");
 
-            print_prices();
+            std::cout << "[QUOTE] XAUUSD: " << std::fixed << std::setprecision(2) << xau_bid << " / " << xau_ask << "\n";
         }
 
-        // FIXED: Handle Test Request / Heartbeat (35=1) with proper response
-        if (msg.find("35=1") != std::string::npos)
-        {
+        if (msg.find("35=1") != std::string::npos) {
             size_t p = msg.find("112=");
-            if (p != std::string::npos)
-            {
-                size_t end = msg.find("\x01", p);
-                std::string testID = msg.substr(p + 4, end - (p + 4));
-
-                // Send proper heartbeat response
-                std::string hb = build_heartbeat(seq++, testID, "QUOTE");
-                SSL_write(ssl, hb.c_str(), hb.size());
-                std::cout << "[FIX] HEARTBEAT SENT (TestReqID=" << testID << ")\n";
+            if (p != std::string::npos) {
+                size_t e = msg.find("\x01", p);
+                std::string tid = msg.substr(p + 4, e - (p + 4));
+                std::string hb = build_heartbeat(session.seq++, tid, "QUOTE");
+                SSL_write(session.ssl, hb.c_str(), hb.size());
             }
         }
 
-        // Handle Reject (35=3)
-        if (msg.find("35=3") != std::string::npos)
-        {
-            size_t text_pos = msg.find("58=");
-            std::string reject_text = "Unknown";
-            if (text_pos != std::string::npos)
-            {
-                size_t end = msg.find("\x01", text_pos);
-                reject_text = msg.substr(text_pos + 3, end - (text_pos + 3));
+        if (msg.find("35=3") != std::string::npos) {
+            size_t p = msg.find("58=");
+            if (p != std::string::npos) {
+                size_t e = msg.find("\x01", p);
+                std::cout << "[QUOTE ERROR] REJECT: " << msg.substr(p + 3, e - (p + 3)) << "\n";
             }
-            std::cout << "[FIX ERROR] REJECT RECEIVED: " << reject_text << "\n";
         }
     }
-
-    SSL_shutdown(ssl);
-    SSL_free(ssl);
-    SSL_CTX_free(ctx);
-    closesocket(sock);
 }
 
-int main(int argc, char* argv[])
+void trade_loop(FixSession& session)
 {
-    std::cout << "========================================\n";
-    std::cout << " CHIMERAMETALS BASELINE - PRODUCTION\n";
-    std::cout << "========================================\n\n";
-
-    // SINGLETON CHECK
-    if (!CheckSingleInstance()) {
-        std::cerr << "ERROR: ChimeraMetals BASELINE is already running!\n";
-        std::cerr << "Only one instance can run at a time.\n\n";
-        std::cerr << "Press Enter to exit...";
-        std::cin.get();
-        return 1;
-    }
-
-    std::cout << "[OK] Singleton check passed\n";
-
-    // INIT TELEMETRY SHARED MEMORY
-    if (!g_telemetry.Init()) {
-        std::cout << "[WARN] Telemetry init failed - dashboard will not work\n";
-    } else {
-        std::cout << "[OK] Telemetry shared memory initialized\n";
-    }
-
-    // LAUNCH TELEMETRY SERVER
-    if (LaunchTelemetry()) {
-        std::cout << "[OK] ChimeraTelemetry server launched\n";
-    } else {
-        std::cout << "[WARN] ChimeraTelemetry launch failed - dashboard will not be available\n";
-    }
-
-    std::this_thread::sleep_for(std::chrono::seconds(2));
-
-    // LOAD CONFIG
-    std::string config = (argc > 1) ? argv[1] : "config.ini";
-
-    if (!load_config(config))
-    {
-        std::cout << "[ERROR] CONFIG LOAD FAILED: " << config << "\n";
-        return 1;
-    }
-
-    std::cout << "[OK] Config loaded from: " << config << "\n";
-    std::cout << "[OK] Connecting to: " << g_cfg.host << ":" << g_cfg.quote_port << "\n";
-    std::cout << "\n>>> Dashboard: http://localhost:8080\n";
-    std::cout << ">>> Press Ctrl+C to stop\n";
-    std::cout << "========================================\n\n";
-
-    WSADATA wsa;
-    WSAStartup(MAKEWORD(2,2), &wsa);
-
-    SSL_library_init();
-    SSL_load_error_strings();
-
-    std::thread q(quote_session);
-    std::thread t(trade_session);
-
-    while (g_running)
-        Sleep(1000);
-
-    q.join();
-    t.join();
-    WSACleanup();
-
-    // Cleanup
-    if (g_singleton_mutex) {
-        ReleaseMutex(g_singleton_mutex);
-        CloseHandle(g_singleton_mutex);
-    }
-
-    return 0;
-}
-
-// TRADE SESSION FUNCTION
-void trade_session()
-{
-    Sleep(2000); // Wait for QUOTE to connect first
-    
-    if (g_cfg.trade_port == 0) {
-        std::cout << "[TRADE] Skipped - trade_port not configured\n";
-        return;
-    }
-    
-    int seq = 1;
-    std::cout << "[TRADE] Connecting to " << g_cfg.host << ":" << g_cfg.trade_port << "...\n";
-
-    SSL_CTX* ctx = SSL_CTX_new(TLS_client_method());
-    if (!ctx) { std::cout << "[TRADE] SSL CTX FAILED\n"; return; }
-
-    struct hostent* he = gethostbyname(g_cfg.host.c_str());
-    if (!he) { std::cout << "[TRADE] HOST LOOKUP FAILED\n"; SSL_CTX_free(ctx); return; }
-
-    SOCKET sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock == INVALID_SOCKET) { std::cout << "[TRADE] SOCKET FAILED\n"; SSL_CTX_free(ctx); return; }
-
-    sockaddr_in addr{};
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(g_cfg.trade_port);
-    memcpy(&addr.sin_addr, he->h_addr, he->h_length);
-
-    if (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-        std::cout << "[TRADE] CONNECT FAILED\n";
-        closesocket(sock);
-        SSL_CTX_free(ctx);
-        return;
-    }
-
-    SSL* ssl = SSL_new(ctx);
-    SSL_set_fd(ssl, sock);
-
-    if (SSL_connect(ssl) <= 0) {
-        std::cout << "[TRADE] SSL HANDSHAKE FAILED\n";
-        ERR_print_errors_fp(stderr);
-        SSL_free(ssl);
-        closesocket(sock);
-        SSL_CTX_free(ctx);
-        return;
-    }
-
-    std::cout << "[TRADE] SSL CONNECTED\n";
-
-    std::string logon = build_logon(seq++, "TRADE");
-    SSL_write(ssl, logon.c_str(), logon.size());
-    std::cout << "[TRADE] LOGON SENT\n";
-
     char buffer[8192];
+
     while (g_running) {
-        int n = SSL_read(ssl, buffer, sizeof(buffer) - 1);
+        int n = SSL_read(session.ssl, buffer, sizeof(buffer) - 1);
         if (n <= 0) {
             std::cout << "[TRADE] CONNECTION CLOSED\n";
             break;
@@ -593,36 +371,123 @@ void trade_session()
         buffer[n] = 0;
         std::string msg(buffer, n);
 
-        if (msg.find("35=A") != std::string::npos) {
-            std::cout << "[TRADE] *** LOGON ACCEPTED ***\n";
-            std::cout << "[TRADE] Ready for order execution (35=D)\n";
-        }
+        if (msg.find("35=A") != std::string::npos)
+            std::cout << "[TRADE] LOGON ACCEPTED\n";
 
         if (msg.find("35=8") != std::string::npos)
-            std::cout << "[TRADE] Execution Report received\n";
-
-        if (msg.find("35=3") != std::string::npos) {
-            size_t p = msg.find("58=");
-            if (p != std::string::npos) {
-                size_t e = msg.find("\x01", p);
-                std::cout << "[TRADE] REJECT: " << msg.substr(p + 3, e - (p + 3)) << "\n";
-            }
-        }
+            std::cout << "[TRADE] EXECUTION REPORT\n";
 
         if (msg.find("35=1") != std::string::npos) {
             size_t p = msg.find("112=");
             if (p != std::string::npos) {
                 size_t e = msg.find("\x01", p);
                 std::string tid = msg.substr(p + 4, e - (p + 4));
-                std::string hb = build_heartbeat(seq++, tid, "TRADE");
-                SSL_write(ssl, hb.c_str(), hb.size());
-                std::cout << "[TRADE] Heartbeat sent\n";
+                std::string hb = build_heartbeat(session.seq++, tid, "TRADE");
+                SSL_write(session.ssl, hb.c_str(), hb.size());
+            }
+        }
+
+        if (msg.find("35=3") != std::string::npos) {
+            size_t p = msg.find("58=");
+            if (p != std::string::npos) {
+                size_t e = msg.find("\x01", p);
+                std::cout << "[TRADE ERROR] REJECT: " << msg.substr(p + 3, e - (p + 3)) << "\n";
             }
         }
     }
+}
 
-    SSL_shutdown(ssl);
-    SSL_free(ssl);
-    SSL_CTX_free(ctx);
-    closesocket(sock);
+// ============================================================================
+// MAIN
+// ============================================================================
+
+int main(int argc, char* argv[])
+{
+    std::cout << "========================================\n";
+    std::cout << " CHIMERAMETALS - PRODUCTION\n";
+    std::cout << " DUAL SESSION (QUOTE + TRADE)\n";
+    std::cout << "========================================\n\n";
+
+    if (!CheckSingleInstance()) {
+        std::cerr << "ERROR: Already running!\n";
+        std::cin.get();
+        return 1;
+    }
+
+    if (!g_telemetry.Init()) {
+        std::cout << "[WARN] Telemetry init failed\n";
+    } else {
+        std::cout << "[OK] Telemetry initialized\n";
+    }
+
+    LaunchTelemetry();
+    Sleep(2000);
+
+    std::string config = (argc > 1) ? argv[1] : "config.ini";
+    if (!load_config(config)) {
+        std::cout << "[ERROR] CONFIG LOAD FAILED\n";
+        return 1;
+    }
+
+    std::cout << "[OK] Config loaded\n";
+    std::cout << "[OK] Connecting to: " << g_cfg.host << ":" << g_cfg.port << "\n\n";
+
+    WSADATA wsa;
+    WSAStartup(MAKEWORD(2, 2), &wsa);
+
+    // ========================================================================
+    // DUAL SESSION SETUP
+    // ========================================================================
+
+    FixSession quote;
+    FixSession trade;
+
+    quote.sub_id = "QUOTE";
+    trade.sub_id = "TRADE";
+
+    // QUOTE SESSION
+    quote.ssl = connect_ssl(g_cfg.host, g_cfg.port);
+    if (!quote.ssl) {
+        std::cout << "[ERROR] QUOTE SSL FAILED\n";
+        return 1;
+    }
+    std::cout << "[QUOTE] SSL CONNECTED\n";
+
+    std::string qlogon = build_logon(quote.seq++, "QUOTE");
+    SSL_write(quote.ssl, qlogon.c_str(), qlogon.size());
+    std::cout << "[QUOTE] LOGON SENT\n\n";
+
+    // TRADE SESSION
+    trade.ssl = connect_ssl(g_cfg.host, g_cfg.port);
+    if (!trade.ssl) {
+        std::cout << "[ERROR] TRADE SSL FAILED\n";
+        return 1;
+    }
+    std::cout << "[TRADE] SSL CONNECTED\n";
+
+    std::string tlogon = build_logon(trade.seq++, "TRADE");
+    SSL_write(trade.ssl, tlogon.c_str(), tlogon.size());
+    std::cout << "[TRADE] LOGON SENT\n\n";
+
+    std::cout << ">>> Dashboard: http://localhost:8080\n";
+    std::cout << "========================================\n\n";
+
+    // Start message loops
+    std::thread qthread(quote_loop, std::ref(quote));
+    std::thread tthread(trade_loop, std::ref(trade));
+
+    qthread.detach();
+    tthread.detach();
+
+    while (g_running)
+        Sleep(1000);
+
+    WSACleanup();
+
+    if (g_singleton_mutex) {
+        ReleaseMutex(g_singleton_mutex);
+        CloseHandle(g_singleton_mutex);
+    }
+
+    return 0;
 }
