@@ -228,11 +228,7 @@ std::string build_marketdata_req(int seq)
          << "269=1\x01"        // Offer
          << "146=2\x01"        // NoRelatedSym
          << "55=XAUUSD\x01"
-         << "48=XAUUSD\x01"
-         << "22=8\x01"
-         << "55=XAGUSD\x01"
-         << "48=XAGUSD\x01"
-         << "22=8\x01";
+         << "55=XAGUSD\x01";
 
     return wrap_fix(body.str());
 }
