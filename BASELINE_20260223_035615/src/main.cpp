@@ -228,7 +228,11 @@ std::string build_marketdata_req(int seq)
          << "269=1\x01"        // Offer
          << "146=2\x01"        // NoRelatedSym
          << "55=XAUUSD\x01"
-         << "55=XAGUSD\x01";
+         << "48=XAUUSD\x01"
+         << "22=8\x01"
+         << "55=XAGUSD\x01"
+         << "48=XAGUSD\x01"
+         << "22=8\x01";
 
     return wrap_fix(body.str());
 }
@@ -360,6 +364,16 @@ void quote_session()
         }
 
         // Handle Market Data Snapshot (35=W) or Incremental (35=X)
+        // Debug: Check for market data messages
+        if (msg.find("35=V") != std::string::npos)
+            std::cout << "[FIX DEBUG] MarketDataRequest ACK detected\n";
+
+        if (msg.find("35=W") != std::string::npos)
+            std::cout << "[FIX DEBUG] Snapshot (35=W) received\n";
+
+        if (msg.find("35=X") != std::string::npos)
+            std::cout << "[FIX DEBUG] Incremental update (35=X) received\n";
+
         if (msg.find("35=W") != std::string::npos || msg.find("35=X") != std::string::npos)
         {
             size_t pos = 0;
