@@ -159,6 +159,7 @@ std::string wrap_fix(const std::string& body)
 std::string build_logon(int seq, const std::string& sub_id)
 {
     std::stringstream body;
+
     body << "35=A\x01"
          << "49=" << g_cfg.sender << "\x01"
          << "56=" << g_cfg.target << "\x01"
@@ -167,9 +168,14 @@ std::string build_logon(int seq, const std::string& sub_id)
          << "34=" << seq << "\x01"
          << "52=" << timestamp() << "\x01"
          << "98=0\x01"
-         << "108=" << g_cfg.heartbeat << "\x01"
-         << "141=Y\x01"
-         << "553=" << g_cfg.username << "\x01"
+         << "108=" << g_cfg.heartbeat << "\x01";
+
+    // CRITICAL: Only reset sequence on QUOTE session
+    // TRADE session MUST NOT have 141=Y or connection drops
+    if (sub_id == "QUOTE")
+        body << "141=Y\x01";
+
+    body << "553=" << g_cfg.username << "\x01"
          << "554=" << g_cfg.password << "\x01";
 
     return wrap_fix(body.str());
