@@ -201,12 +201,14 @@ std::string build_trade_logon(int seq)
     body << "35=A\x01"
          << "49=" << g_cfg.sender << "\x01"
          << "56=" << g_cfg.target << "\x01"
-         << "50=QUOTE\x01"
-         << "57=QUOTE\x01"
+         << "50=TRADE\x01"
+         << "57=TRADE\x01"
          << "34=" << seq << "\x01"
          << "52=" << timestamp() << "\x01"
          << "98=0\x01"
-         << "108=30\x01";
+         << "108=30\x01"
+         << "553=" << g_cfg.username << "\x01"
+         << "554=" << g_cfg.password << "\x01";
 
     return wrap_fix(body.str());
 }
