@@ -316,6 +316,10 @@ void quote_session()
 
         buffer[n] = 0;
         std::string msg(buffer, n);
+        // DEBUG: Show ALL FIX messages received
+        std::cout << "[FIX DEBUG] Received " << n << " bytes:" << std::endl;
+        std::cout << msg << std::endl;
+        std::cout << "---" << std::endl;
 
         if (msg.find("35=A") != std::string::npos)
         {
