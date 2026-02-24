@@ -486,6 +486,8 @@ int main(int argc, char* argv[])
     }
 
     std::cout << "[OK] Config loaded\n";
+    std::cout << "[CONFIG] quote_port=" << g_cfg.port << "\n";
+    std::cout << "[CONFIG] trade_port=" << g_cfg.trade_port << "\n";
     std::cout << "[OK] Connecting to: " << g_cfg.host << ":" << g_cfg.port << "\n\n";
 
     WSADATA wsa;
