@@ -25,6 +25,7 @@ HANDLE g_singleton_mutex = NULL;
 struct Config {
     std::string host;
     int quote_port = 0;
+    int trade_port = 0;
     std::string sender;
     std::string target;
     std::string username;
@@ -135,6 +136,7 @@ bool load_config(const std::string& path)
 
         if (key == "host") g_cfg.host = val;
         if (key == "port") g_cfg.quote_port = std::stoi(val);
+        if (key == "trade_port") g_cfg.trade_port = std::stoi(val);
         if (key == "sender_comp_id") g_cfg.sender = val;
         if (key == "target_comp_id") g_cfg.target = val;
         if (key == "username") g_cfg.username = val;
@@ -509,11 +511,13 @@ int main(int argc, char* argv[])
     SSL_load_error_strings();
 
     std::thread q(quote_session);
+    std::thread t(trade_session);
 
     while (g_running)
         Sleep(1000);
 
     q.join();
+    t.join();
     WSACleanup();
 
     // Cleanup
@@ -523,4 +527,101 @@ int main(int argc, char* argv[])
     }
 
     return 0;
+}
+
+// TRADE SESSION FUNCTION
+void trade_session()
+{
+    Sleep(2000); // Wait for QUOTE to connect first
+    
+    if (g_cfg.trade_port == 0) {
+        std::cout << "[TRADE] Skipped - trade_port not configured\n";
+        return;
+    }
+    
+    int seq = 1;
+    std::cout << "[TRADE] Connecting to " << g_cfg.host << ":" << g_cfg.trade_port << "...\n";
+
+    SSL_CTX* ctx = SSL_CTX_new(TLS_client_method());
+    if (!ctx) { std::cout << "[TRADE] SSL CTX FAILED\n"; return; }
+
+    struct hostent* he = gethostbyname(g_cfg.host.c_str());
+    if (!he) { std::cout << "[TRADE] HOST LOOKUP FAILED\n"; SSL_CTX_free(ctx); return; }
+
+    SOCKET sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock == INVALID_SOCKET) { std::cout << "[TRADE] SOCKET FAILED\n"; SSL_CTX_free(ctx); return; }
+
+    sockaddr_in addr{};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(g_cfg.trade_port);
+    memcpy(&addr.sin_addr, he->h_addr, he->h_length);
+
+    if (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+        std::cout << "[TRADE] CONNECT FAILED\n";
+        closesocket(sock);
+        SSL_CTX_free(ctx);
+        return;
+    }
+
+    SSL* ssl = SSL_new(ctx);
+    SSL_set_fd(ssl, sock);
+
+    if (SSL_connect(ssl) <= 0) {
+        std::cout << "[TRADE] SSL HANDSHAKE FAILED\n";
+        ERR_print_errors_fp(stderr);
+        SSL_free(ssl);
+        closesocket(sock);
+        SSL_CTX_free(ctx);
+        return;
+    }
+
+    std::cout << "[TRADE] SSL CONNECTED\n";
+
+    std::string logon = build_logon(seq++, "TRADE");
+    SSL_write(ssl, logon.c_str(), logon.size());
+    std::cout << "[TRADE] LOGON SENT\n";
+
+    char buffer[8192];
+    while (g_running) {
+        int n = SSL_read(ssl, buffer, sizeof(buffer) - 1);
+        if (n <= 0) {
+            std::cout << "[TRADE] CONNECTION CLOSED\n";
+            break;
+        }
+
+        buffer[n] = 0;
+        std::string msg(buffer, n);
+
+        if (msg.find("35=A") != std::string::npos) {
+            std::cout << "[TRADE] *** LOGON ACCEPTED ***\n";
+            std::cout << "[TRADE] Ready for order execution (35=D)\n";
+        }
+
+        if (msg.find("35=8") != std::string::npos)
+            std::cout << "[TRADE] Execution Report received\n";
+
+        if (msg.find("35=3") != std::string::npos) {
+            size_t p = msg.find("58=");
+            if (p != std::string::npos) {
+                size_t e = msg.find("\x01", p);
+                std::cout << "[TRADE] REJECT: " << msg.substr(p + 3, e - (p + 3)) << "\n";
+            }
+        }
+
+        if (msg.find("35=1") != std::string::npos) {
+            size_t p = msg.find("112=");
+            if (p != std::string::npos) {
+                size_t e = msg.find("\x01", p);
+                std::string tid = msg.substr(p + 4, e - (p + 4));
+                std::string hb = build_heartbeat(seq++, tid, "TRADE");
+                SSL_write(ssl, hb.c_str(), hb.size());
+                std::cout << "[TRADE] Heartbeat sent\n";
+            }
+        }
+    }
+
+    SSL_shutdown(ssl);
+    SSL_free(ssl);
+    SSL_CTX_free(ctx);
+    closesocket(sock);
 }
