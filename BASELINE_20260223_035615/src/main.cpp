@@ -29,6 +29,7 @@ HANDLE g_singleton_mutex = NULL;
 struct Config {
     std::string host;
     int port = 0;
+    int trade_port = 0;
     std::string sender;
     std::string target;
     std::string username;
@@ -126,6 +127,7 @@ bool load_config(const std::string& path)
 
         if (key == "host") g_cfg.host = val;
         if (key == "port") g_cfg.port = std::stoi(val);
+        if (key == "trade_port") g_cfg.trade_port = std::stoi(val);
         if (key == "sender_comp_id") g_cfg.sender = val;
         if (key == "target_comp_id") g_cfg.target = val;
         if (key == "username") g_cfg.username = val;
