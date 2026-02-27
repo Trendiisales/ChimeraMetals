@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChimeraMetals - Professional Trading Desk</title>
+    <link rel="icon" type="image/png" href="/chimera_logo.png">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0a0e14;
+            --bg-secondary: #151a23;
+            --glass-bg: rgba(26, 31, 46, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --text-primary: #e6e8eb;
+            --text-secondary: #8b92a8;
+            --accent-blue: #00d4ff;
+            --accent-cyan: #00ffd4;
+            --green: #00ff88;
+            --red: #ff4444;
+            --orange: #ff9500;
+            --purple: #a855f7;
+        }
+
+        body {
+            font-family: 'Segoe UI', -apple-system, system-ui, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at 20% 50%, rgba(0, 212, 255, 0.1) 0%, transparent 50%),
+                        radial-gradient(circle at 80% 80%, rgba(168, 85, 247, 0.1) 0%, transparent 50%),
+                        radial-gradient(circle at 40% 20%, rgba(0, 255, 132, 0.05) 0%, transparent 50%);
+            animation: drift 30s ease-in-out infinite;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        @keyframes drift {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            33% { transform: translate(3%, -3%) rotate(5deg); }
+            66% { transform: translate(-3%, 3%) rotate(-5deg); }
+        }
+
+        .container {
+            max-width: 1920px;
+            margin: 0 auto;
+            padding: 12px;
+            position: relative;
+            z-index: 1;
+        }
+
+        header {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            padding: 16px 24px;
+            border-radius: 16px;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .logo-icon {
+            width: 48px;
+            height: 48px;
+            background: url('/chimera_logo.png') center/contain no-repeat;
+            filter: contrast(1.2) brightness(1.1) drop-shadow(0 0 10px rgba(0, 212, 255, 0.3));
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
+        }
+
+        .logo-text {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .logo-title {
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-cyan) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .logo-subtitle {
+            font-size: 11px;
+            color: var(--text-secondary);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .status-bar {
+            display: flex;
+            gap: 24px;
+            align-items: center;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            border: 1px solid var(--glass-border);
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            position: relative;
+        }
+
+        .status-dot::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            border-radius: 50%;
+            background: inherit;
+            filter: blur(4px);
+            opacity: 0.6;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .status-dot.connected { background: var(--green); }
+        .status-dot.disconnected { background: var(--red); }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.6; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.2); }
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 12px;
+        }
+
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .glass-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 48px rgba(0, 0, 0, 0.4);
+        }
+
+        .glass-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--accent-blue) 0%, var(--accent-cyan) 100%);
+            opacity: 0.8;
+        }
+
+        .card-title {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-title::before {
+            content: '';
+            width: 4px;
+            height: 16px;
+            background: linear-gradient(180deg, var(--accent-blue), var(--accent-cyan));
+            border-radius: 2px;
+        }
+
+        .pnl-card {
+            grid-column: span 3;
+        }
+
+        .pnl-value {
+            font-size: 42px;
+            font-weight: 800;
+            margin: 12px 0;
+            letter-spacing: -1px;
+            text-shadow: 0 0 20px currentColor;
+        }
+
+        .pnl-positive { color: var(--green); }
+        .pnl-negative { color: var(--red); }
+
+        .pnl-change {
+            font-size: 14px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .market-card {
+            grid-column: span 3;
+        }
+
+        .price-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            margin-bottom: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .price-row:last-of-type {
+            margin-bottom: 0;
+        }
+
+        .symbol {
+            font-weight: 700;
+            font-size: 15px;
+            letter-spacing: 0.5px;
+        }
+
+        .prices {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .bid {
+            color: var(--green);
+            font-weight: 700;
+            font-size: 16px;
+            text-shadow: 0 0 10px currentColor;
+        }
+
+        .ask {
+            color: var(--red);
+            font-weight: 700;
+            font-size: 16px;
+            text-shadow: 0 0 10px currentColor;
+        }
+
+        .spread {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-align: right;
+            margin-top: 8px;
+        }
+
+        .latency-card {
+            grid-column: span 2;
+        }
+
+        .latency-value {
+            font-size: 32px;
+            font-weight: 800;
+            color: var(--accent-blue);
+            margin: 12px 0;
+            text-shadow: 0 0 20px var(--accent-blue);
+        }
+
+        .latency-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .regime-card {
+            grid-column: span 4;
+        }
+
+        .regime-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .regime-item {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .regime-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+            transform: translateY(-2px);
+        }
+
+        .regime-name {
+            font-size: 10px;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .regime-value {
+            font-size: 18px;
+            font-weight: 700;
+            text-shadow: 0 0 10px currentColor;
+        }
+
+        .regime-FADE { color: var(--accent-blue); }
+        .regime-MOMENTUM { color: var(--orange); }
+        .regime-COMPRESSION { color: var(--purple); }
+        .regime-NORMAL { color: var(--text-secondary); }
+
+        .trades-card {
+            grid-column: span 12;
+        }
+
+        .trades-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .trades-table th {
+            text-align: left;
+            padding: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 1px;
+        }
+
+        .trades-table td {
+            padding: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .trades-table tr:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .side-buy { 
+            color: var(--green); 
+            font-weight: 600;
+            text-shadow: 0 0 8px currentColor;
+        }
+        
+        .side-sell { 
+            color: var(--red); 
+            font-weight: 600;
+            text-shadow: 0 0 8px currentColor;
+        }
+
+        .sparkline-card {
+            grid-column: span 6;
+            height: 240px;
+        }
+
+        canvas {
+            width: 100%;
+            height: 180px;
+            border-radius: 8px;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .metric {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 16px;
+            text-align: center;
+            transition: all 0.2s ease;
+        }
+
+        .metric:hover {
+            background: rgba(255, 255, 255, 0.05);
+            transform: translateY(-2px);
+        }
+
+        .metric-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .metric-value {
+            font-size: 24px;
+            font-weight: 800;
+            color: var(--accent-blue);
+            text-shadow: 0 0 15px var(--accent-blue);
+        }
+
+        .time {
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        @media (max-width: 1400px) {
+            .grid {
+                grid-template-columns: repeat(6, 1fr);
+            }
+            .pnl-card, .market-card { grid-column: span 3; }
+            .latency-card { grid-column: span 2; }
+            .regime-card { grid-column: span 6; }
+            .sparkline-card { grid-column: span 6; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <div class="logo-icon"></div>
+                <div class="logo-text">
+                    <div class="logo-title">ChimeraMetals</div>
+                    <div class="logo-subtitle">Professional Trading Desk</div>
+                </div>
+            </div>
+            <div class="status-bar">
+                <div class="status-item">
+                    <div class="status-dot disconnected" id="statusDot"></div>
+                    <span id="statusText">Connecting...</span>
+                </div>
+                <div class="status-item time" id="clock">--:--:--</div>
+            </div>
+        </header>
+
+        <div class="grid">
+            <div class="glass-card pnl-card">
+                <div class="card-title">Daily P&L</div>
+                <div class="pnl-value pnl-positive" id="pnl">$0.00</div>
+                <div class="pnl-change" id="pnlChange">+$0.00 today</div>
+            </div>
+
+            <div class="glass-card market-card">
+                <div class="card-title">Market Data</div>
+                <div class="price-row">
+                    <span class="symbol">XAUUSD</span>
+                    <div class="prices">
+                        <span class="bid" id="xauBid">--</span>
+                        <span class="ask" id="xauAsk">--</span>
+                    </div>
+                </div>
+                <div class="price-row">
+                    <span class="symbol">XAGUSD</span>
+                    <div class="prices">
+                        <span class="bid" id="xagBid">--</span>
+                        <span class="ask" id="xagAsk">--</span>
+                    </div>
+                </div>
+                <div class="spread" id="spread">Spread: --</div>
+            </div>
+
+            <div class="glass-card latency-card">
+                <div class="card-title">FIX RTT</div>
+                <div class="latency-value" id="rttLast">-- ms</div>
+                <div class="latency-label">Last</div>
+            </div>
+
+            <div class="glass-card latency-card">
+                <div class="card-title">P50</div>
+                <div class="latency-value" id="rttP50">-- ms</div>
+                <div class="latency-label">Median</div>
+            </div>
+
+            <div class="glass-card latency-card">
+                <div class="card-title">P95</div>
+                <div class="latency-value" id="rttP95">-- ms</div>
+                <div class="latency-label">95th Pct</div>
+            </div>
+
+            <div class="glass-card regime-card">
+                <div class="card-title">Trading Engines</div>
+                <div class="regime-grid">
+                    <div class="regime-item">
+                        <div class="regime-name">HFT Engine</div>
+                        <div class="regime-value regime-NORMAL" id="hftRegime">NORMAL</div>
+                    </div>
+                    <div class="regime-item">
+                        <div class="regime-name">Strategy Engine</div>
+                        <div class="regime-value regime-NORMAL" id="strategyRegime">NORMAL</div>
+                    </div>
+                    <div class="regime-item">
+                        <div class="regime-name">HFT Trigger</div>
+                        <div class="regime-value" id="hftTrigger">NONE</div>
+                    </div>
+                    <div class="regime-item">
+                        <div class="regime-name">Strategy Trigger</div>
+                        <div class="regime-value" id="strategyTrigger">NONE</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card sparkline-card">
+                <div class="card-title">XAUUSD Price Chart</div>
+                <canvas id="xauChart"></canvas>
+            </div>
+
+            <div class="glass-card sparkline-card">
+                <div class="card-title">XAGUSD Price Chart</div>
+                <canvas id="xagChart"></canvas>
+            </div>
+
+            <div class="glass-card" style="grid-column: span 12;">
+                <div class="card-title">Session Metrics</div>
+                <div class="metrics-grid">
+                    <div class="metric">
+                        <div class="metric-label">HFT P&L</div>
+                        <div class="metric-value" id="hftPnl">$0.00</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">Strategy P&L</div>
+                        <div class="metric-value" id="strategyPnl">$0.00</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">Total Trades</div>
+                        <div class="metric-value" id="totalTrades">0</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">Win Rate</div>
+                        <div class="metric-value" id="winRate">0%</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card trades-card">
+                <div class="card-title">Recent Trades</div>
+                <table class="trades-table">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Symbol</th>
+                            <th>Side</th>
+                            <th>Size</th>
+                            <th>Price</th>
+                            <th>Engine</th>
+                            <th>Regime</th>
+                            <th>P&L</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tradesBody">
+                        <tr>
+                            <td colspan="8" style="text-align: center; color: var(--text-secondary);">No trades yet</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = "/api/telemetry";
+        const HISTORY_LENGTH = 100;
+        
+        let xauHistory = [];
+        let xagHistory = [];
+        
+        function fetchData() {
+            fetch(API_URL)
+                .then(response => response.json())
+                .then(data => {
+                    updateDashboard(data);
+                    document.getElementById("statusDot").className = "status-dot connected";
+                    document.getElementById("statusText").textContent = "Connected";
+                })
+                .catch(error => {
+                    console.error("Fetch error:", error);
+                    document.getElementById("statusDot").className = "status-dot disconnected";
+                    document.getElementById("statusText").textContent = "Disconnected";
+                });
+        }
+        
+        function updateDashboard(data) {
+            document.getElementById("xauBid").textContent = data.xau_bid.toFixed(2);
+            document.getElementById("xauAsk").textContent = data.xau_ask.toFixed(2);
+            document.getElementById("xagBid").textContent = data.xag_bid.toFixed(2);
+            document.getElementById("xagAsk").textContent = data.xag_ask.toFixed(2);
+            
+            const spread = (data.xau_ask - data.xau_bid).toFixed(2);
+            document.getElementById("spread").textContent = "Spread: " + spread + " pips";
+            
+            const totalPnl = data.hft_pnl + data.strategy_pnl;
+            const pnlEl = document.getElementById("pnl");
+            pnlEl.textContent = "$" + totalPnl.toFixed(2);
+            pnlEl.className = "pnl-value " + (totalPnl >= 0 ? "pnl-positive" : "pnl-negative");
+            
+            document.getElementById("rttLast").textContent = data.fix_rtt_last.toFixed(1) + " ms";
+            document.getElementById("rttP50").textContent = data.fix_rtt_p50.toFixed(1) + " ms";
+            document.getElementById("rttP95").textContent = data.fix_rtt_p95.toFixed(1) + " ms";
+            
+            const hftRegimeEl = document.getElementById("hftRegime");
+            hftRegimeEl.textContent = data.hft_regime;
+            hftRegimeEl.className = "regime-value regime-" + data.hft_regime;
+            
+            const stratRegimeEl = document.getElementById("strategyRegime");
+            stratRegimeEl.textContent = data.strategy_regime;
+            stratRegimeEl.className = "regime-value regime-" + data.strategy_regime;
+            
+            document.getElementById("hftTrigger").textContent = data.hft_trigger;
+            document.getElementById("strategyTrigger").textContent = data.strategy_trigger;
+            
+            document.getElementById("hftPnl").textContent = "$" + data.hft_pnl.toFixed(2);
+            document.getElementById("strategyPnl").textContent = "$" + data.strategy_pnl.toFixed(2);
+            
+            xauHistory.push((data.xau_bid + data.xau_ask) / 2);
+            xagHistory.push((data.xag_bid + data.xag_ask) / 2);
+            
+            if (xauHistory.length > HISTORY_LENGTH) xauHistory.shift();
+            if (xagHistory.length > HISTORY_LENGTH) xagHistory.shift();
+            
+            drawSparkline("xauChart", xauHistory, "#00d4ff");
+            drawSparkline("xagChart", xagHistory, "#a855f7");
+        }
+        
+        function drawSparkline(canvasId, data, color) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+            const ctx = canvas.getContext("2d");
+            const width = canvas.width = canvas.offsetWidth * 2;
+            const height = canvas.height = canvas.offsetHeight * 2;
+            
+            ctx.clearRect(0, 0, width, height);
+            
+            if (data.length < 2) return;
+            
+            const min = Math.min(...data);
+            const max = Math.max(...data);
+            const range = max - min || 1;
+            
+            const gradient = ctx.createLinearGradient(0, 0, 0, height);
+            gradient.addColorStop(0, color);
+            gradient.addColorStop(1, color + "40");
+            
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.moveTo(0, height);
+            
+            data.forEach((value, index) => {
+                const x = (index / (data.length - 1)) * width;
+                const y = height - ((value - min) / range) * height;
+                ctx.lineTo(x, y);
+            });
+            
+            ctx.lineTo(width, height);
+            ctx.closePath();
+            ctx.fill();
+            
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 3;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = color;
+            ctx.beginPath();
+            
+            data.forEach((value, index) => {
+                const x = (index / (data.length - 1)) * width;
+                const y = height - ((value - min) / range) * height;
+                
+                if (index === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            });
+            
+            ctx.stroke();
+        }
+        
+        function updateClock() {
+            const now = new Date();
+            const time = now.toLocaleTimeString("en-US", { hour12: false });
+            document.getElementById("clock").textContent = time;
+        }
+        
+        setInterval(fetchData, 100);
+        setInterval(updateClock, 1000);
+        fetchData();
+        updateClock();
+    </script>
+</body>
+</html>
