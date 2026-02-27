@@ -1,0 +1,3 @@
+C:/ChimeraMetals/ChimeraTelemetry/build/CMakeFiles/ChimeraTelemetry.dir
+C:/ChimeraMetals/ChimeraTelemetry/build/CMakeFiles/ALL_BUILD.dir
+C:/ChimeraMetals/ChimeraTelemetry/build/CMakeFiles/ZERO_CHECK.dir

@@ -1,0 +1,111 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChimeraMetals V3 - Institutional Trading Desk</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:linear-gradient(135deg,#0a0e27 0%,#1a1f3a 100%);color:#e0e0e0;overflow-x:hidden;min-height:100vh}
+.container{max-width:1600px;margin:0 auto;padding:20px;position:relative;z-index:1}
+header{background:rgba(255,255,255,.05);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:30px;margin-bottom:30px}
+h1{font-size:2.5em;font-weight:300;letter-spacing:2px;background:linear-gradient(135deg,#00ff7f,#00bfff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:10px}
+.subtitle{font-size:.9em;color:#888;letter-spacing:1px}
+.status-badge{display:inline-block;padding:8px 16px;background:rgba(0,255,127,.2);border:1px solid rgba(0,255,127,.3);border-radius:20px;font-size:.85em;margin-top:15px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px;margin-bottom:20px}
+.panel{background:rgba(255,255,255,.03);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:24px}
+.panel-header{font-size:.75em;text-transform:uppercase;letter-spacing:2px;color:#666;margin-bottom:16px}
+.metric{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.metric:last-child{border-bottom:none}
+.label{font-size:.9em;color:#999}
+.value{font-size:1.3em;font-weight:500;font-variant-numeric:tabular-nums}
+.value.large{font-size:2.2em;font-weight:300}
+.positive{color:#00ff7f}
+.negative{color:#ff6b6b}
+.neutral{color:#00bfff}
+.progress-bar{width:100%;height:6px;background:rgba(255,255,255,.05);border-radius:3px;overflow:hidden;margin-top:8px}
+.progress-fill{height:100%;background:linear-gradient(90deg,#00ff7f,#00bfff);border-radius:3px;transition:width .5s ease}
+.connection-status{position:fixed;top:20px;right:20px;padding:10px 20px;background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.1);border-radius:20px;font-size:.85em;z-index:1000}
+.status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px}
+.status-dot.connected{background:#00ff7f}
+.status-dot.disconnected{background:#ff6b6b}
+</style>
+</head>
+<body>
+<div class="connection-status">
+<span class="status-dot disconnected" id="statusDot"></span>
+<span id="statusText">CONNECTING...</span>
+</div>
+<div class="container">
+<header>
+<h1>CHIMERAMETALS V3</h1>
+<div class="subtitle">INSTITUTIONAL GRADE TRADING DESK</div>
+<div class="status-badge">● LIVE PRODUCTION</div>
+</header>
+<div class="grid">
+<div class="panel">
+<div class="panel-header">XAU/USD</div>
+<div class="metric"><span class="label">BID</span><span class="value positive" id="xau-bid">$0.00</span></div>
+<div class="metric"><span class="label">ASK</span><span class="value neutral" id="xau-ask">$0.00</span></div>
+</div>
+<div class="panel">
+<div class="panel-header">XAG/USD</div>
+<div class="metric"><span class="label">BID</span><span class="value positive" id="xag-bid">$0.00</span></div>
+<div class="metric"><span class="label">ASK</span><span class="value neutral" id="xag-ask">$0.00</span></div>
+</div>
+<div class="panel">
+<div class="panel-header">HFT ENGINE P&L</div>
+<div class="value large positive" id="hft-pnl">$0.00</div>
+<div class="progress-bar"><div class="progress-fill" id="hft-bar" style="width:50%"></div></div>
+</div>
+<div class="panel">
+<div class="panel-header">STRUCTURE ENGINE P&L</div>
+<div class="value large positive" id="strategy-pnl">$0.00</div>
+<div class="progress-bar"><div class="progress-fill" id="strategy-bar" style="width:50%"></div></div>
+</div>
+<div class="panel">
+<div class="panel-header">EXECUTION LATENCY</div>
+<div class="metric"><span class="label">LAST</span><span class="value neutral" id="rtt-last">0.00ms</span></div>
+<div class="metric"><span class="label">P50</span><span class="value" id="rtt-p50">0.00ms</span></div>
+<div class="metric"><span class="label">P95</span><span class="value" id="rtt-p95">0.00ms</span></div>
+</div>
+<div class="panel">
+<div class="panel-header">STRATEGY STATUS</div>
+<div class="metric"><span class="label">RISK MODE</span><span class="value positive" id="risk-mode">—</span></div>
+<div class="metric"><span class="label">REGIME</span><span class="value neutral" id="regime">—</span></div>
+<div class="metric"><span class="label">HFT SIGNAL</span><span class="value" id="hft-signal">—</span></div>
+<div class="metric"><span class="label">STRUCTURE SIGNAL</span><span class="value" id="structure-signal">—</span></div>
+</div>
+</div>
+</div>
+<script>
+const ws=new WebSocket('ws://185.167.119.59:8080');
+const statusDot=document.getElementById('statusDot');
+const statusText=document.getElementById('statusText');
+ws.onopen=()=>{statusDot.className='status-dot connected';statusText.textContent='LIVE'};
+ws.onclose=()=>{statusDot.className='status-dot disconnected';statusText.textContent='DISCONNECTED'};
+ws.onmessage=(event)=>{
+const data=JSON.parse(event.data);
+document.getElementById('xau-bid').textContent='$'+data.xau_bid.toFixed(2);
+document.getElementById('xau-ask').textContent='$'+data.xau_ask.toFixed(2);
+document.getElementById('xag-bid').textContent='$'+data.xag_bid.toFixed(2);
+document.getElementById('xag-ask').textContent='$'+data.xag_ask.toFixed(2);
+const hftPnl=document.getElementById('hft-pnl');
+const stratPnl=document.getElementById('strategy-pnl');
+hftPnl.textContent='$'+data.hft_pnl.toFixed(2);
+stratPnl.textContent='$'+data.strategy_pnl.toFixed(2);
+hftPnl.className='value large '+(data.hft_pnl>=0?'positive':'negative');
+stratPnl.className='value large '+(data.strategy_pnl>=0?'positive':'negative');
+document.getElementById('hft-bar').style.width=Math.min(100,Math.max(0,50+data.hft_pnl/4))+'%';
+document.getElementById('strategy-bar').style.width=Math.min(100,Math.max(0,50+data.strategy_pnl/4))+'%';
+document.getElementById('rtt-last').textContent=data.rtt_last.toFixed(2)+'ms';
+document.getElementById('rtt-p50').textContent=data.rtt_p50.toFixed(2)+'ms';
+document.getElementById('rtt-p95').textContent=data.rtt_p95.toFixed(2)+'ms';
+document.getElementById('risk-mode').textContent=data.risk_mode;
+document.getElementById('regime').textContent=data.regime;
+document.getElementById('hft-signal').textContent=data.hft_signal;
+document.getElementById('structure-signal').textContent=data.structure_signal;
+};
+</script>
+</body>
+</html>
