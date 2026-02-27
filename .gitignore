@@ -1,0 +1,40 @@
+# Build artifacts
+build/
+Release/
+Debug/
+*.exe
+*.obj
+*.pdb
+*.ilk
+*.log
+
+# Sequence state files
+quote_seq.dat
+trade_seq.dat
+
+# Position snapshots
+position_snapshot.dat
+
+# Logs
+*.log
+chimera_audit.log
+watchdog_heartbeat.txt
+
+# VS files
+.vs/
+*.vcxproj.user
+*.sln
+
+# Backup files
+*.backup
+*.old
+
+# CMake cache
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+
+# Credentials - NEVER commit
+config.ini
+*.key
+*.pem
