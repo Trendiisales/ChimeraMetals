@@ -1,0 +1,10 @@
+^C:\CHIMERAMETALS\CHIMERATELEMETRY\BUILD\CMAKEFILES\628B87C8834C3ED19FFCDBF7E63F0B02\GENERATE.STAMP.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/ChimeraMetals/ChimeraTelemetry -BC:/ChimeraMetals/ChimeraTelemetry/build --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file C:/ChimeraMetals/ChimeraTelemetry/build/ChimeraTelemetry.sln
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

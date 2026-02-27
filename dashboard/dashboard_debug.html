@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Debug Dashboard</title>
+</head>
+<body style="background: #000; color: #0f0; font-family: monospace; padding: 20px;">
+    <h1>ChimeraMetals Debug Console</h1>
+    <div id="status">Connecting...</div>
+    <hr>
+    <div id="data" style="white-space: pre;"></div>
+    
+    <script>
+        const ws = new WebSocket('ws://185.167.119.59:8080');
+        const statusDiv = document.getElementById('status');
+        const dataDiv = document.getElementById('data');
+        
+        ws.onopen = () => {
+            statusDiv.textContent = 'CONNECTED';
+            statusDiv.style.color = '#0f0';
+        };
+        
+        ws.onclose = () => {
+            statusDiv.textContent = 'DISCONNECTED';
+            statusDiv.style.color = '#f00';
+        };
+        
+        ws.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                const timestamp = new Date().toLocaleTimeString();
+                
+                dataDiv.innerHTML = `
+[${timestamp}] RAW DATA:
+${JSON.stringify(data, null, 2)}
+
+XAU/USD BID: ${data.xau_bid} (type: ${typeof data.xau_bid})
+XAU/USD ASK: ${data.xau_ask} (type: ${typeof data.xau_ask})
+XAG/USD BID: ${data.xag_bid} (type: ${typeof data.xag_bid})
+XAG/USD ASK: ${data.xag_ask} (type: ${typeof data.xag_ask})
+
+REGIME: ${data.regime}
+RISK MODE: ${data.risk_mode}
+                `;
+            } catch (e) {
+                dataDiv.innerHTML = 'ERROR: ' + e.message + '\n\nRAW: ' + event.data;
+            }
+        };
+    </script>
+</body>
+</html>

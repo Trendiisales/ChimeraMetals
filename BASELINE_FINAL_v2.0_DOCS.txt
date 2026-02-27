@@ -1,0 +1,113 @@
+===============================================================================
+                      BASELINE FINAL v2.0 - IMMUTABLE
+                         PRODUCTION SYSTEM LOCKED
+===============================================================================
+
+COMMIT: beff01f
+TAG:    BASELINE_FINAL_v2.0
+DATE:   February 24, 2026
+BACKUP: BASELINE_FINAL_v2.0.tar.gz (19KB)
+
+===============================================================================
+STATUS: ✅ FULLY OPERATIONAL - ZERO ISSUES
+===============================================================================
+
+VERIFIED WORKING:
+-----------------
+✅ QUOTE session: Port 5211 - LOGON ACCEPTED
+✅ TRADE session: Port 5212 - LOGON ACCEPTED  
+✅ XAUUSD live: $5188.66 / $5188.88
+✅ XAGUSD live: $87.46 / $87.49
+✅ Dashboard: http://185.167.119.59:8080
+✅ Telemetry: 10Hz shared memory
+✅ Console: Clean, 5-second throttle
+
+===============================================================================
+CONFIGURATION (IMMUTABLE)
+===============================================================================
+
+Host: demo-uk-eqx-02.p.c-trader.com
+Credentials: 2067070 / Bowen6feb
+
+QUOTE Session (Port 5211):
+- 49=demo.blackbull.2067070
+- 56=cServer
+- 50=QUOTE, 57=QUOTE
+- 141=Y (reset seq)
+- 553/554 (credentials)
+
+TRADE Session (Port 5212):
+- 49=demo.blackbull.2067070
+- 56=cServer  
+- 50=TRADE, 57=TRADE
+- NO 141
+- 553/554 (credentials)
+
+Symbols:
+- 41 = XAUUSD
+- 42 = XAGUSD
+
+===============================================================================
+FILE STRUCTURE
+===============================================================================
+
+BASELINE_20260223_035615/
+├── src/
+│   ├── main.cpp (518 lines) - PRODUCTION CODE
+│   └── TelemetryWriter.hpp
+├── config.ini
+└── CMakeLists.txt
+
+ChimeraTelemetry/
+└── build/Release/ChimeraTelemetry.exe
+
+dashboard/
+└── index.html
+
+===============================================================================
+DEPLOYMENT
+===============================================================================
+
+VPS:
+cd C:\ChimeraMetals
+git checkout BASELINE_FINAL_v2.0
+.\REBUILD_AND_START.ps1
+
+Dashboard:
+http://185.167.119.59:8080
+
+Expected Output:
+[QUOTE] LOGON ACCEPTED
+[TRADE] LOGON ACCEPTED
+=== MARKET DATA ===
+XAUUSD: 5188.66 / 5188.88
+XAGUSD: 87.46 / 87.49
+
+===============================================================================
+IMMUTABLE RULES
+===============================================================================
+
+DO NOT MODIFY THIS BASELINE EXCEPT FOR:
+1. Live migration (different broker/credentials)
+2. Order execution implementation
+3. Risk management additions
+
+For any changes:
+1. Create new branch from this baseline
+2. Test thoroughly
+3. Create new baseline version
+
+To restore:
+git checkout BASELINE_FINAL_v2.0
+tar -xzf BASELINE_FINAL_v2.0.tar.gz
+
+===============================================================================
+GITHUB
+===============================================================================
+
+Repository: https://github.com/Trendiisales/ChimeraMetals
+Tag: BASELINE_FINAL_v2.0
+
+===============================================================================
+THIS IS THE LOCKED BASELINE - DO NOT MODIFY
+===============================================================================

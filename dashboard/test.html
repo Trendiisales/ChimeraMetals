@@ -1,0 +1,74 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChimeraMetals V3 - Trading Desk</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+        }
+        .container { max-width: 1600px; margin: 0 auto; padding: 20px; }
+        header {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+        h1 {
+            font-size: 2.5em;
+            font-weight: 300;
+            background: linear-gradient(135deg, #00ff7f, #00bfff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 20px;
+        }
+        .panel {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 24px;
+        }
+        .panel:hover { transform: translateY(-2px); }
+        .value { font-size: 2em; color: #00ff7f; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>CHIMERAMETALS V3</h1>
+            <p>INSTITUTIONAL TRADING DESK</p>
+        </header>
+        <div class="grid">
+            <div class="panel">
+                <h2>XAU/USD</h2>
+                <div class="value">$2,034.50</div>
+            </div>
+            <div class="panel">
+                <h2>XAG/USD</h2>
+                <div class="value">$22.45</div>
+            </div>
+            <div class="panel">
+                <h2>HFT P&L</h2>
+                <div class="value">$150.00</div>
+            </div>
+            <div class="panel">
+                <h2>STRUCTURE P&L</h2>
+                <div class="value">$80.00</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+
