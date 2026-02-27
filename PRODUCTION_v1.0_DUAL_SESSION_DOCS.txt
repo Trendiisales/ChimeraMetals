@@ -1,0 +1,90 @@
+===============================================================================
+           PRODUCTION BASELINE v1.0 - DUAL SESSION AUTHENTICATED
+===============================================================================
+
+COMMIT: 1073bee
+TAG:    PRODUCTION_v1.0_DUAL_SESSION
+DATE:   February 24, 2026
+
+===============================================================================
+SYSTEM STATUS: ✅ PRODUCTION READY
+===============================================================================
+
+VERIFIED WORKING:
+-----------------
+✅ QUOTE session: Port 5211 SSL - LOGON ACCEPTED
+✅ TRADE session: Port 5212 SSL - LOGON ACCEPTED
+✅ Market data: XAUUSD streaming live ($5185)
+✅ Dashboard: http://185.167.119.59:8080 operational
+✅ Telemetry: 10Hz shared memory updates
+✅ Console: Throttled to 5-second intervals
+
+CRITICAL CONFIGURATION:
+-----------------------
+Host: demo-uk-eqx-02.p.c-trader.com
+
+QUOTE Session (Port 5211):
+- SenderCompID: demo.blackbull.2067070
+- TargetCompID: cServer
+- SenderSubID: QUOTE (50=QUOTE)
+- TargetSubID: QUOTE (57=QUOTE)
+- ResetSeqNum: YES (141=Y)
+- Credentials: YES (553/554)
+
+TRADE Session (Port 5212):
+- SenderCompID: demo.blackbull.2067070
+- TargetCompID: cServer
+- SenderSubID: TRADE (50=TRADE)
+- TargetSubID: TRADE (57=TRADE)
+- ResetSeqNum: NO (no 141)
+- Credentials: YES (553/554)
+
+SYMBOL MAPPING:
+---------------
+41 = XAUUSD (Gold)
+42 = XAGUSD (Silver)
+
+===============================================================================
+KNOWN MINOR ISSUE
+===============================================================================
+
+XAGUSD displays 0.00 in console/dashboard
+- FIX data is arriving correctly (symbol ID 42)
+- Parser receives bid/ask data
+- Issue is display/mapping only
+- Does not affect system stability
+- Fix planned for next commit
+
+===============================================================================
+IMMUTABLE PRODUCTION STATE
+===============================================================================
+
+This baseline represents WORKING dual-session FIX connectivity.
+DO NOT modify except for:
+1. XAGUSD display fix
+2. Live migration
+3. Order execution implementation
+
+To restore this exact state:
+git checkout PRODUCTION_v1.0_DUAL_SESSION
+
+===============================================================================
+DEPLOYMENT
+===============================================================================
+
+VPS:
+cd C:\ChimeraMetals
+git checkout PRODUCTION_v1.0_DUAL_SESSION
+.\REBUILD_AND_START.ps1
+
+Dashboard:
+http://185.167.119.59:8080
+
+Expected Console Output:
+[QUOTE] LOGON ACCEPTED
+[TRADE] LOGON ACCEPTED
+[QUOTE] MARKET DATA REQUEST SENT
+=== MARKET DATA ===
+XAUUSD: 5185.08 / 5185.30
+
+===============================================================================

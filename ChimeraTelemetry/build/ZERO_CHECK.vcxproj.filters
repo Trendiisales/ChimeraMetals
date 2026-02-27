@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\ChimeraMetals\ChimeraTelemetry\build\CMakeFiles\628b87c8834c3ed19ffcdbf7e63f0b02\generate.stamp.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{7623A24C-3D23-3A49-B90D-37E67E0F907C}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

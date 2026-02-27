@@ -51,7 +51,7 @@ void TelemetryServer::run(int port) {
     }
 #endif
 
-    server_fd_ = static_cast<int>(socket(AF_INET, SOCK_STREAM, 0));
+    server_fd_ = static_cast<int>(socket(AF_INET, SOCK_STREAM, 0);
     if (server_fd_ < 0) {
         std::cerr << "[TelemetryServer] Failed to create socket" << std::endl;
 #ifdef _WIN32
@@ -89,7 +89,7 @@ void TelemetryServer::run(int port) {
     std::cout << "[TelemetryServer] Listening on port " << port << std::endl;
 
     while (running_.load(std::memory_order_acquire)) {
-        int c = static_cast<int>(accept(server_fd_, nullptr, nullptr));
+        int c = static_cast<int>(accept(server_fd_, nullptr, nullptr);
         if (c < 0) {
             if (running_.load(std::memory_order_acquire)) {
                 std::cerr << "[TelemetryServer] Accept failed" << std::endl;
@@ -116,7 +116,7 @@ void TelemetryServer::run(int port) {
             if (hMap) {
                 TelemetrySnapshot* snap = (TelemetrySnapshot*)MapViewOfFile(hMap, FILE_MAP_READ, 0, 0, sizeof(TelemetrySnapshot));
                 if (snap) {
-                    char json[4096];
+                    char json[2048];
                     snprintf(json, sizeof(json),
                         "{"
                         "\"xau_bid\":%.2f,"
@@ -125,40 +125,17 @@ void TelemetryServer::run(int port) {
                         "\"xag_ask\":%.2f,"
                         "\"hft_pnl\":%.2f,"
                         "\"strategy_pnl\":%.2f,"
-                        "\"daily_pnl\":%.2f,"
                         "\"fix_rtt_last\":%.1f,"
                         "\"fix_rtt_p50\":%.1f,"
                         "\"fix_rtt_p95\":%.1f,"
-                        "\"xau_position\":%.2f,"
-                        "\"xag_position\":%.2f,"
-                        "\"sharpe_ratio\":%.3f,"
-                        "\"win_rate\":%.1f,"
-                        "\"avg_win\":%.2f,"
-                        "\"avg_loss\":%.2f,"
-                        "\"fill_rate\":%.1f,"
-                        "\"total_orders\":%d,"
-                        "\"total_fills\":%d,"
-                        "\"total_trades\":%d,"
-                        "\"max_drawdown\":%.2f,"
-                        "\"fix_quote_status\":\"%s\","
-                        "\"fix_trade_status\":\"%s\","
-                        "\"quote_msg_rate\":%d,"
-                        "\"trade_msg_rate\":%d,"
-                        "\"sequence_gaps\":%d,"
                         "\"hft_regime\":\"%s\","
                         "\"strategy_regime\":\"%s\","
                         "\"hft_trigger\":\"%s\","
                         "\"strategy_trigger\":\"%s\""
                         "}",
                         snap->xau_bid, snap->xau_ask, snap->xag_bid, snap->xag_ask,
-                        snap->hft_pnl, snap->strategy_pnl, snap->daily_pnl,
+                        snap->hft_pnl, snap->strategy_pnl,
                         snap->fix_rtt_last, snap->fix_rtt_p50, snap->fix_rtt_p95,
-                        snap->xau_position, snap->xag_position,
-                        snap->sharpe_ratio, snap->win_rate, snap->avg_win, snap->avg_loss,
-                        snap->fill_rate, snap->total_orders, snap->total_fills, snap->total_trades,
-                        snap->max_drawdown,
-                        snap->fix_quote_status, snap->fix_trade_status,
-                        snap->quote_msg_rate, snap->trade_msg_rate, snap->sequence_gaps,
                         snap->hft_regime, snap->strategy_regime, snap->hft_trigger, snap->strategy_trigger
                     );
                     body = std::string(json);

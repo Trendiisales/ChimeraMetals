@@ -1,0 +1,3 @@
+C:/ChimeraMetals/build/CMakeFiles/ChimeraMetal.dir
+C:/ChimeraMetals/build/CMakeFiles/ALL_BUILD.dir
+C:/ChimeraMetals/build/CMakeFiles/ZERO_CHECK.dir

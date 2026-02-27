@@ -1,0 +1,187 @@
+===============================================================================
+                 CHIMERAMETALS BASELINE v1.0 - PRODUCTION
+                          VERIFIED WORKING SYSTEM
+===============================================================================
+
+COMMIT: d5d9ad3
+TAG:    BASELINE_WORKING_v1.0
+DATE:   February 24, 2026
+
+===============================================================================
+SYSTEM STATUS: ✅ FULLY OPERATIONAL
+===============================================================================
+
+WORKING COMPONENTS:
+-------------------
+✅ Dual FIX 4.4 Sessions (QUOTE + TRADE)
+✅ SSL/TLS connections to BlackBull demo
+✅ QUOTE session: Market data for XAUUSD/XAGUSD
+✅ TRADE session: Order execution ready
+✅ Numeric symbol ID parsing (41=XAUUSD, 42=XAGUSD)
+✅ Global price state persistence
+✅ Shared memory telemetry (10Hz updates)
+✅ WebSocket dashboard server
+✅ Glassmorphic UI with live prices
+✅ Sparkline charts
+
+VERIFIED OUTPUT:
+----------------
+VPS Console:
+[QUOTE] LOGON ACCEPTED
+[QUOTE] SECURITY LIST RECEIVED
+[QUOTE] MARKET DATA REQUEST SENT
+[QUOTE] XAUUSD: 5172.77 / 5172.99
+[QUOTE] XAGUSD: 86.77 / 86.81
+
+Dashboard (http://185.167.119.59:8080):
+XAU/USD: $5172.77 / $5172.99 ✅
+XAG/USD: $86.77 / $86.81 ✅
+Status: NORMAL / CONNECTED ✅
+Sparklines: Drawing live ✅
+
+===============================================================================
+CRITICAL FIXES APPLIED
+===============================================================================
+
+1. NUMERIC SYMBOL IDs (f517224)
+   - Changed 55=XAUUSD → 55=41
+   - Changed 55=XAGUSD → 55=42
+   - Broker requires numeric IDs, not string names
+
+2. PARSER FIX (12fc66b)
+   - Extract symbolId from 55= tag
+   - Map 41 → XAUUSD, 42 → XAGUSD
+   - Store in global maps with string keys
+
+3. GLOBAL PRICE STATE (d5d9ad3)
+   - Created g_xau_bid, g_xau_ask, g_xag_bid, g_xag_ask
+   - Prevents reset to zero on alternating messages
+   - Telemetry always sends latest known prices
+
+4. TRADE SESSION 141=Y FIX (c2db3d8)
+   - Only send 141=Y (ResetSeqNumFlag) on QUOTE
+   - TRADE session must NOT have 141=Y
+   - Prevents silent disconnect
+
+5. DUAL SESSION ARCHITECTURE (7ea76e0)
+   - Separate SSL connections for QUOTE/TRADE
+   - Independent sequence numbers
+   - Thread-safe message loops
+
+===============================================================================
+CONFIGURATION
+===============================================================================
+
+File: C:\ChimeraMetals\BASELINE_20260223_035615\config.ini
+
+[fix]
+host = demo-uk-eqx-02.p.c-trader.com
+port = 5211
+sender_comp_id = demo.blackbull.2067070
+target_comp_id = cServer
+username = 2067070
+password = Bowen6feb
+heartbeat_interval = 30
+
+[dashboard]
+port = 7777
+
+===============================================================================
+DEPLOYMENT
+===============================================================================
+
+VPS Deploy:
+-----------
+cd C:\ChimeraMetals
+git pull origin main
+.\REBUILD_AND_START.ps1
+
+Mac Dashboard:
+--------------
+http://185.167.119.59:8080
+
+Expected Output:
+----------------
+[QUOTE] SSL CONNECTED
+[QUOTE] LOGON SENT
+[QUOTE] LOGON ACCEPTED
+[TRADE] SSL CONNECTED
+[TRADE] LOGON SENT
+[TRADE] LOGON ACCEPTED
+[QUOTE] SECURITY LIST RECEIVED
+[QUOTE] MARKET DATA REQUEST SENT
+[QUOTE] XAUUSD: 5172.77 / 5172.99
+
+===============================================================================
+FILE STRUCTURE
+===============================================================================
+
+BASELINE_20260223_035615/
+├── src/
+│   ├── main.cpp (503 lines) - PRODUCTION CODE
+│   ├── TelemetryWriter.hpp - Shared memory writer
+│   └── main_OLD_BROKEN.cpp - Previous version (backup)
+├── config.ini - FIX credentials
+└── CMakeLists.txt - Build configuration
+
+ChimeraTelemetry/
+├── src/main.cpp - WebSocket server
+└── build/Release/ChimeraTelemetry.exe
+
+dashboard/
+└── index.html - Glassmorphic UI
+
+===============================================================================
+KNOWN LIMITATIONS
+===============================================================================
+
+1. Hardcoded Symbol IDs
+   - 41=XAUUSD, 42=XAGUSD hardcoded in parser
+   - For production: Parse security list dynamically
+
+2. TRADE Session
+   - Connects but not yet sending orders
+   - Ready for order execution (35=D messages)
+
+3. Demo Account
+   - Using BlackBull demo credentials
+   - For live: Update config.ini with live credentials
+
+===============================================================================
+NEXT STEPS FOR LIVE MIGRATION
+===============================================================================
+
+1. Update config.ini with live credentials
+2. Change host to live FIX endpoint
+3. Test QUOTE session with live data
+4. Test TRADE session with small orders
+5. Implement dynamic symbol ID mapping
+6. Add order execution logic
+7. Add risk management
+
+===============================================================================
+BACKUP
+===============================================================================
+
+Tarball: BASELINE_WORKING_v1.0.tar.gz (18KB)
+Git Tag: BASELINE_WORKING_v1.0
+GitHub:  https://github.com/Trendiisales/ChimeraMetals
+
+To restore:
+git checkout BASELINE_WORKING_v1.0
+
+===============================================================================
+IMMUTABLE UNTIL LIVE MIGRATION
+===============================================================================
+
+This baseline is LOCKED and should NOT be modified except for live migration.
+Any experimental changes should be done in a separate branch.
+
+DO NOT MODIFY:
+- Core FIX message builders
+- Dual session architecture
+- Numeric symbol ID logic (41/42)
+- Global price state variables
+- Telemetry update flow
+
+===============================================================================

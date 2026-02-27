@@ -1,0 +1,248 @@
+std::string GlassHTML()
+{
+return R"(
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>ChimeraMetal Desk</title>
+
+<style>
+
+:root{
+--bg1:#0c0f1a;
+--bg2:#141a2b;
+--neon:#7b5cff;
+--accent:#00c3ff;
+--green:#00ff9c;
+--red:#ff4b8a;
+}
+
+body{
+margin:0;
+font-family:Inter,Segoe UI,Arial;
+background:
+radial-gradient(circle at 15% 20%, #1e2445 0%, transparent 40%),
+radial-gradient(circle at 80% 70%, #2a1144 0%, transparent 45%),
+linear-gradient(160deg,var(--bg1),var(--bg2));
+color:white;
+overflow-x:hidden;
+}
+
+.container{
+max-width:1400px;
+margin:auto;
+padding:40px;
+}
+
+.glass{
+background:rgba(255,255,255,0.04);
+backdrop-filter:blur(22px);
+border:1px solid rgba(255,255,255,0.08);
+border-radius:18px;
+padding:28px;
+box-shadow:
+0 10px 40px rgba(0,0,0,0.4),
+0 0 40px rgba(123,92,255,0.08);
+transition:all .3s ease;
+}
+
+.glass:hover{
+box-shadow:
+0 12px 50px rgba(0,0,0,0.5),
+0 0 50px rgba(123,92,255,0.18);
+}
+
+.header{
+display:flex;
+justify-content:space-between;
+align-items:center;
+margin-bottom:30px;
+}
+
+.title{
+font-size:22px;
+letter-spacing:1px;
+font-weight:600;
+color:#c7bfff;
+}
+
+.status{
+font-size:12px;
+padding:6px 14px;
+border-radius:20px;
+background:rgba(0,255,156,0.15);
+color:var(--green);
+}
+
+.price-strip{
+display:flex;
+justify-content:space-between;
+gap:40px;
+}
+
+.price-block{
+font-size:28px;
+font-weight:600;
+}
+
+.bid{color:var(--green);}
+.ask{color:var(--red);}
+
+.grid{
+display:grid;
+grid-template-columns: 1fr 1fr;
+gap:30px;
+margin-top:30px;
+}
+
+.metric{
+font-size:14px;
+opacity:.8;
+margin-top:8px;
+}
+
+.pnl-positive{color:var(--green);}
+.pnl-negative{color:var(--red);}
+
+.latency{
+margin-top:30px;
+font-size:14px;
+opacity:.8;
+}
+
+.regime-RISK_ON{
+box-shadow:0 0 40px rgba(0,195,255,0.25);
+}
+
+.regime-RANGE{
+box-shadow:0 0 40px rgba(123,92,255,0.25);
+}
+
+.flash{
+animation:flash 0.4s ease;
+}
+
+@keyframes flash{
+0%{opacity:0.2;}
+100%{opacity:1;}
+}
+
+</style>
+</head>
+<body>
+
+<div class="container">
+
+<div class="header">
+<div class="title">ChimeraMetal Operator Desk</div>
+<div class="status">CONNECTED</div>
+</div>
+
+<div class="glass price-strip">
+<div class="price-block">
+XAU:
+<span id="xau_bid" class="bid">-</span> /
+<span id="xau_ask" class="ask">-</span>
+</div>
+
+<div class="price-block">
+XAG:
+<span id="xag_bid" class="bid">-</span> /
+<span id="xag_ask" class="ask">-</span>
+</div>
+</div>
+
+<div class="grid">
+
+<div id="hft_card" class="glass">
+<div class="title">HFT Engine</div>
+<div class="metric">PnL: <span id="hft_pnl"></span></div>
+<div class="metric">Regime: <span id="hft_regime"></span></div>
+<div class="metric">Trigger: <span id="hft_trigger"></span></div>
+</div>
+
+<div id="strategy_card" class="glass">
+<div class="title">Strategy Engine</div>
+<div class="metric">PnL: <span id="strategy_pnl"></span></div>
+<div class="metric">Regime: <span id="strategy_regime"></span></div>
+<div class="metric">Trigger: <span id="strategy_trigger"></span></div>
+</div>
+
+</div>
+
+<div class="glass latency">
+FIX RTT ?
+Last: <span id="rtt_last"></span> ms |
+P50: <span id="rtt_p50"></span> ms |
+P95: <span id="rtt_p95"></span> ms
+</div>
+
+</div>
+
+<script>
+
+let lastXau = 0;
+let lastXag = 0;
+
+var evt = new EventSource("/stream");
+
+evt.onmessage = function(e){
+
+var d = JSON.parse(e.data);
+
+updatePrice("xau_bid", d.xau_bid, 2);
+updatePrice("xau_ask", d.xau_ask, 2);
+updatePrice("xag_bid", d.xag_bid, 3);
+updatePrice("xag_ask", d.xag_ask, 3);
+
+updatePnL("hft_pnl", d.hft_pnl);
+updatePnL("strategy_pnl", d.strategy_pnl);
+
+hft_regime.innerText = d.hft_regime;
+strategy_regime.innerText = d.strategy_regime;
+
+hft_trigger.innerText = d.hft_trigger;
+strategy_trigger.innerText = d.strategy_trigger;
+
+rtt_last.innerText = d.fix_rtt_last.toFixed(2);
+rtt_p50.innerText = d.fix_rtt_p50.toFixed(2);
+rtt_p95.innerText = d.fix_rtt_p95.toFixed(2);
+
+applyRegime("hft_card", d.hft_regime);
+applyRegime("strategy_card", d.strategy_regime);
+
+};
+
+function updatePrice(id,val,dp){
+let el = document.getElementById(id);
+if(el.innerText != val.toFixed(dp)){
+el.classList.add("flash");
+setTimeout(()=>el.classList.remove("flash"),200);
+}
+el.innerText = val.toFixed(dp);
+}
+
+function updatePnL(id,val){
+let el = document.getElementById(id);
+el.innerText = val.toFixed(2);
+if(val >= 0){
+el.className="pnl-positive";
+}else{
+el.className="pnl-negative";
+}
+}
+
+function applyRegime(cardId,regime){
+let card=document.getElementById(cardId);
+card.classList.remove("regime-RISK_ON","regime-RANGE");
+if(regime==="RISK_ON") card.classList.add("regime-RISK_ON");
+if(regime==="RANGE") card.classList.add("regime-RANGE");
+}
+
+</script>
+
+</body>
+</html>
+)";
+}

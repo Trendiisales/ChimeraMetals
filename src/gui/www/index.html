@@ -654,10 +654,6 @@
             document.getElementById("hftPnl").textContent = "$" + data.hft_pnl.toFixed(2);
             document.getElementById("strategyPnl").textContent = "$" + data.strategy_pnl.toFixed(2);
             
-            // NEW METRICS
-            document.getElementById("totalTrades").textContent = data.total_trades || 0;
-            document.getElementById("winRate").textContent = (data.win_rate || 0).toFixed(1) + "%";
-            
             xauHistory.push((data.xau_bid + data.xau_ask) / 2);
             xagHistory.push((data.xag_bid + data.xag_ask) / 2);
             
